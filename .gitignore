@@ -1,0 +1,13 @@
+node_modules/
+.next/
+backend/venv/
+backend/db/oracle.db
+backend/db/chroma/
+__pycache__/
+*.pyc
+.env
+.env.local
+*.db
+*.db-shm
+*.db-wal
+memory_*.db
