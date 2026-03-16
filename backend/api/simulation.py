@@ -323,8 +323,21 @@ async def list_persistent_agents():
             "use_count": a.get("use_count", 0),
             "created_at": a.get("created_at", ""),
             "rating": a.get("rating", "unrated"),
+            "is_active": a.get("is_active", 1),
         })
     return result
+
+
+@router.patch("/agents/persistent/{agent_id}/active")
+async def toggle_agent_active(agent_id: str, body: dict):
+    """エージェントのアクティブ/休止を切り替え"""
+    is_active = 1 if body.get("is_active", True) else 0
+    with db_conn() as conn:
+        conn.execute(
+            "UPDATE persistent_agents SET is_active=? WHERE id=?",
+            (is_active, agent_id),
+        )
+    return {"id": agent_id, "is_active": is_active}
 
 
 @router.post("/agents/persistent/{agent_id}/rate")

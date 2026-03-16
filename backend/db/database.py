@@ -128,6 +128,7 @@ CREATE TABLE IF NOT EXISTS persistent_agents (
     created_at TEXT NOT NULL,
     rating TEXT DEFAULT 'unrated',
     post_frequency TEXT DEFAULT 'medium',
+    is_active INTEGER DEFAULT 1,
     UNIQUE(name)
 );
 
@@ -183,6 +184,7 @@ def init_db():
             ("speech_patterns", "TEXT DEFAULT '[]'"),
             ("debate_tactics", "TEXT DEFAULT ''"),
             ("social_position", "TEXT DEFAULT ''"),
+            ("is_active", "INTEGER DEFAULT 1"),
         ]
         for col_name, col_def in new_columns:
             try:

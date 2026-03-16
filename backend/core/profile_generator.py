@@ -683,7 +683,7 @@ def _try_reuse_persistent_agents(scale: str, custom_agents: Optional[int], key_i
         # bad評価のエージェントを先に削除
         _replace_bad_agents(None, theme, key_issues)
 
-        cached = get_persistent_agents(limit=agent_count + 5, include_bad=False)
+        cached = [a for a in get_persistent_agents(limit=agent_count + 20, include_bad=False) if a.get("is_active", 1) == 1]
 
         if not cached:
             return ([], agent_count)  # 全員新規生成
