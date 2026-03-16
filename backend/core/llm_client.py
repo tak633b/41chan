@@ -14,17 +14,24 @@ from typing import List, Dict, Any, Optional
 from openai import OpenAI
 
 
+import threading
+
+# ZAI用グローバルロック（複数インスタンスが並列でZAIを叩くと429になるため直列化）
+_ZAI_LOCK = threading.Lock()
+_ZAI_LAST_CALL = 0.0
+
+
 class OracleLLMClient:
     """LLMクライアント（ZAI / Ollama / OpenRouter 切替対応、リトライ付き）"""
 
     # ZAI設定
     ZAI_API_KEY = "***REDACTED_ZAI***"
     ZAI_BASE_URL = "https://api.z.ai/api/coding/paas/v4"
-    ZAI_MODEL = "glm-5"
+    ZAI_MODEL = os.environ.get("ORACLE_ZAI_MODEL", "glm-5")
 
     # Ollama設定
     OLLAMA_API_URL = "http://localhost:11434/api/chat"
-    OLLAMA_MODEL = "ministral-oracle"
+    OLLAMA_MODEL = os.environ.get("ORACLE_OLLAMA_MODEL", "qwen3.5:9b")
 
     # OpenRouter設定
     OPENROUTER_API_KEY = os.environ.get(
@@ -92,18 +99,31 @@ class OracleLLMClient:
 
     def _call_openai_compat(self, messages: List[Dict[str, str]], temperature: float) -> str:
         """OpenAI互換API呼び出し（ZAI / OpenRouter共通）"""
+        global _ZAI_LAST_CALL
+
         kwargs = {
             "model": self.model,
             "messages": messages,
             "temperature": temperature,
         }
         if self.backend == "zai":
+            # GLM-5はデフォルトでthinking ON → 明示的に無効化（速度・トークン節約）
             kwargs["extra_body"] = {"thinking": {"type": "disabled"}}
         elif self.backend == "openrouter" and "qwen" in self.model.lower():
             # Qwen3.5公式: enable_thinking=False で思考モード無効化
             kwargs["extra_body"] = {"chat_template_kwargs": {"enable_thinking": False}}
 
-        response = self.client.chat.completions.create(**kwargs)
+        if self.backend == "zai":
+            # ZAIは並列リクエストで429になるためグローバルロックで直列化
+            with _ZAI_LOCK:
+                elapsed = time.time() - _ZAI_LAST_CALL
+                if elapsed < self.MIN_CALL_INTERVAL:
+                    time.sleep(self.MIN_CALL_INTERVAL - elapsed)
+                response = self.client.chat.completions.create(**kwargs)
+                _ZAI_LAST_CALL = time.time()
+        else:
+            response = self.client.chat.completions.create(**kwargs)
+
         content = response.choices[0].message.content
         if content is None:
             raise ValueError("LLM content is None")
@@ -111,12 +131,16 @@ class OracleLLMClient:
 
     def chat(
         self,
-        messages: List[Dict[str, str]],
+        messages,  # List[Dict[str, str]] または str
         temperature: float = 0.7,
         max_retries: int = 6,
         num_predict: int = 8192,
     ) -> str:
         """リトライ付きLLM呼び出し"""
+        # 文字列が渡された場合はuserメッセージに変換
+        if isinstance(messages, str):
+            messages = [{"role": "user", "content": messages}]
+
         elapsed = time.time() - self._last_call_time
         if elapsed < self._interval:
             time.sleep(self._interval - elapsed)
