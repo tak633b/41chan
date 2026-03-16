@@ -20,7 +20,7 @@ class OracleLLMClient:
     # ZAI設定
     ZAI_API_KEY = "***REDACTED_ZAI***"
     ZAI_BASE_URL = "https://api.z.ai/api/coding/paas/v4"
-    ZAI_MODEL = "glm-4.7"
+    ZAI_MODEL = "glm-5"
 
     # Ollama設定
     OLLAMA_API_URL = "http://localhost:11434/api/chat"
@@ -70,7 +70,7 @@ class OracleLLMClient:
         self._last_call_time = 0.0
         print(f"[OracleLLM] バックエンド: {self.backend} | モデル: {self.model}")
 
-    def _call_ollama(self, messages: List[Dict[str, str]], temperature: float) -> str:
+    def _call_ollama(self, messages: List[Dict[str, str]], temperature: float, num_predict: int = 8192) -> str:
         """Ollama native API 直接呼び出し"""
         payload = {
             "model": self.model,
@@ -79,10 +79,10 @@ class OracleLLMClient:
             "think": False,
             "options": {
                 "temperature": temperature,
-                "num_predict": 8192,
+                "num_predict": num_predict,
             },
         }
-        resp = requests.post(self.OLLAMA_API_URL, json=payload, timeout=300)
+        resp = requests.post(self.OLLAMA_API_URL, json=payload, timeout=600)
         resp.raise_for_status()
         data = resp.json()
         content = data.get("message", {}).get("content", "")
@@ -114,6 +114,7 @@ class OracleLLMClient:
         messages: List[Dict[str, str]],
         temperature: float = 0.7,
         max_retries: int = 6,
+        num_predict: int = 8192,
     ) -> str:
         """リトライ付きLLM呼び出し"""
         elapsed = time.time() - self._last_call_time
@@ -126,7 +127,7 @@ class OracleLLMClient:
         for attempt in range(retries):
             try:
                 if self.backend == "ollama":
-                    content = self._call_ollama(messages, temperature)
+                    content = self._call_ollama(messages, temperature, num_predict=num_predict)
                 else:
                     content = self._call_openai_compat(messages, temperature)
 
@@ -166,9 +167,10 @@ class OracleLLMClient:
         self,
         messages: List[Dict[str, str]],
         temperature: float = 0.3,
+        num_predict: int = 8192,
     ) -> Dict[str, Any]:
         """JSON応答を取得。regex抽出。"""
-        content = self.chat(messages, temperature=temperature)
+        content = self.chat(messages, temperature=temperature, num_predict=num_predict)
         # chat()で既にthinking除去済みだが、念のため残りを除去
         # 閉じタグありの場合
         content = re.sub(r"<think>[\s\S]*?</think>", "", content)
@@ -191,17 +193,31 @@ class OracleLLMClient:
         # クォートなし絵文字を修正: "emoji":🧠, → "emoji":"🧠",
         cleaned = re.sub(r'("emoji"\s*:\s*)([^\s",\{\[\]]+)', lambda m: m.group(1) + '"' + m.group(2) + '"', cleaned)
 
-        # { } で囲まれたJSONを抽出（貪欲マッチ → 段階的にパース試行）
+        # { } で囲まれたJSONを抽出（文字列対応の深さカウンタ）
         # まず最外側の {} ペアを段階的に探す
         start = cleaned.find("{")
         if start == -1:
             raise ValueError(f"レスポンス中にJSONが見つかりませんでした: {content[:200]}")
 
         depth = 0
+        in_string = False
+        escape_next = False
         for i in range(start, len(cleaned)):
-            if cleaned[i] == "{":
+            ch = cleaned[i]
+            if escape_next:
+                escape_next = False
+                continue
+            if ch == "\\" and in_string:
+                escape_next = True
+                continue
+            if ch == '"':
+                in_string = not in_string
+                continue
+            if in_string:
+                continue  # 文字列内の { } はカウントしない
+            if ch == "{":
                 depth += 1
-            elif cleaned[i] == "}":
+            elif ch == "}":
                 depth -= 1
                 if depth == 0:
                     json_str = cleaned[start:i+1]

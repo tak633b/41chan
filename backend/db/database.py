@@ -177,10 +177,46 @@ def init_db():
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     with db_conn() as conn:
         conn.executescript(SCHEMA_SQL)
+        new_columns = [
+            ("emotional_wound", "TEXT DEFAULT ''"),
+            ("information_bias", "TEXT DEFAULT ''"),
+            ("speech_patterns", "TEXT DEFAULT '[]'"),
+            ("debate_tactics", "TEXT DEFAULT ''"),
+            ("social_position", "TEXT DEFAULT ''"),
+        ]
+        for col_name, col_def in new_columns:
+            try:
+                conn.execute(f"ALTER TABLE persistent_agents ADD COLUMN {col_name} {col_def}")
+            except Exception:
+                pass
+        # agents テーブルにも新フィールドを追加
+        agents_new_columns = [
+            ("emotional_wound", "TEXT DEFAULT ''"),
+            ("information_bias", "TEXT DEFAULT ''"),
+            ("speech_patterns", "TEXT DEFAULT '[]'"),
+            ("debate_tactics", "TEXT DEFAULT ''"),
+            ("social_position", "TEXT DEFAULT ''"),
+        ]
+        for col_name, col_def in agents_new_columns:
+            try:
+                conn.execute(f"ALTER TABLE agents ADD COLUMN {col_name} {col_def}")
+            except Exception:
+                pass
     print(f"[DB] 初期化完了: {DB_PATH}")
 
 
 # --- CRUD ヘルパー ---
+
+def list_interrupted_simulations() -> List[Dict]:
+    """起動時に再開すべき中断シミュレーション（simulating/extracting/generating_agents/planning状態）を返す"""
+    with db_conn() as conn:
+        rows = conn.execute(
+            """SELECT * FROM simulations
+               WHERE status IN ('simulating', 'extracting', 'generating_agents', 'planning')
+               ORDER BY created_at DESC"""
+        ).fetchall()
+        return [dict(r) for r in rows]
+
 
 def get_simulation(sim_id: str) -> Optional[Dict]:
     with db_conn() as conn:
@@ -224,6 +260,27 @@ def get_threads(board_id: str) -> List[Dict]:
         return [dict(r) for r in rows]
 
 
+def get_agent_past_posts(agent_name: str, exclude_sim_id: str = "", limit: int = 100) -> List[str]:
+    """エージェントの過去シミュレーション全体の投稿内容を取得（類似度チェック用）"""
+    with db_conn() as conn:
+        if exclude_sim_id:
+            rows = conn.execute(
+                """SELECT p.content FROM posts p
+                   JOIN threads t ON p.thread_id = t.id
+                   WHERE p.agent_name = ? AND t.simulation_id != ?
+                   ORDER BY p.created_at DESC LIMIT ?""",
+                (agent_name, exclude_sim_id, limit),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """SELECT p.content FROM posts p
+                   WHERE p.agent_name = ?
+                   ORDER BY p.created_at DESC LIMIT ?""",
+                (agent_name, limit),
+            ).fetchall()
+        return [r["content"] for r in rows if r["content"]]
+
+
 def get_posts(thread_id: str) -> List[Dict]:
     with db_conn() as conn:
         rows = conn.execute(
@@ -256,8 +313,9 @@ def save_persistent_agents(agents_data: List[Dict]):
             conn.execute(
                 """INSERT OR IGNORE INTO persistent_agents
                    (id, name, username, bio, persona, age, gender, mbti,
-                    tone_style, profession, interested_topics, posting_style, created_at)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    tone_style, profession, interested_topics, posting_style, created_at,
+                    emotional_wound, information_bias, speech_patterns, debate_tactics, social_position)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (
                     a.get("id", str(uuid.uuid4())),
                     a["name"],
@@ -272,8 +330,45 @@ def save_persistent_agents(agents_data: List[Dict]):
                     json.dumps(a.get("interested_topics", []), ensure_ascii=False) if isinstance(a.get("interested_topics"), list) else a.get("interested_topics", "[]"),
                     a.get("posting_style", "emotional"),
                     datetime.now().isoformat(),
+                    a.get("emotional_wound", ""),
+                    a.get("information_bias", ""),
+                    json.dumps(a.get("speech_patterns", []), ensure_ascii=False) if isinstance(a.get("speech_patterns"), list) else a.get("speech_patterns", "[]"),
+                    a.get("debate_tactics", ""),
+                    a.get("social_position", ""),
                 ),
             )
+
+
+def save_persistent_agent(agent) -> None:
+    """OracleAgentオブジェクトを永続テーブルに保存（INSERT OR REPLACE）"""
+    with db_conn() as conn:
+        conn.execute(
+            """INSERT OR REPLACE INTO persistent_agents
+               (id, name, username, bio, persona, age, gender, mbti,
+                tone_style, profession, interested_topics, posting_style, created_at,
+                emotional_wound, information_bias, speech_patterns, debate_tactics, social_position)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (
+                str(uuid.uuid4()),
+                agent.name,
+                getattr(agent, "username", ""),
+                getattr(agent, "bio", ""),
+                getattr(agent, "persona", ""),
+                getattr(agent, "age", 30),
+                getattr(agent, "gender", "other"),
+                getattr(agent, "mbti", ""),
+                getattr(agent, "tone_style", "worker"),
+                getattr(agent, "profession", ""),
+                json.dumps(getattr(agent, "interested_topics", []), ensure_ascii=False),
+                getattr(agent, "posting_style", "emotional"),
+                datetime.now().isoformat(),
+                agent.emotional_wound if hasattr(agent, 'emotional_wound') else "",
+                agent.information_bias if hasattr(agent, 'information_bias') else "",
+                json.dumps(agent.speech_patterns if hasattr(agent, 'speech_patterns') and agent.speech_patterns else [], ensure_ascii=False),
+                agent.debate_tactics if hasattr(agent, 'debate_tactics') else "",
+                agent.social_position if hasattr(agent, 'social_position') else "",
+            ),
+        )
 
 
 def get_persistent_agents(limit: int = 20, include_bad: bool = True) -> List[Dict]:

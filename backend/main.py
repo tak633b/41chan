@@ -15,7 +15,7 @@ if os.path.exists(_env_path):
             _line = _line.strip()
             if _line and not _line.startswith("#") and "=" in _line:
                 _k, _v = _line.split("=", 1)
-                os.environ.setdefault(_k.strip(), _v.strip())
+                os.environ[_k.strip()] = _v.strip()  # .env を正とする（LaunchAgent等の環境変数を上書き）
 
 
 
@@ -30,7 +30,7 @@ asyncio.get_event_loop().set_default_executor(
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from db.database import init_db
+from db.database import init_db, list_interrupted_simulations, update_simulation
 from api.simulation import router as sim_router
 from api.board import router as board_router
 from api.stream import router as stream_router
@@ -38,7 +38,7 @@ from api.report import router as report_router
 from api.ask import router as ask_router
 
 app = FastAPI(
-    title="Oracle Channel API",
+    title="41ch API",
     description="5ch風シミュレーション閲覧Webアプリのバックエンド",
     version="1.0.0",
 )
@@ -67,9 +67,32 @@ app.include_router(ask_router, prefix="/api")
 
 @app.on_event("startup")
 async def startup_event():
-    """起動時にDBを初期化"""
+    """起動時にDBを初期化 + 中断シミュレーションを自動再開"""
     init_db()
-    print("[Oracle Channel] バックエンド起動完了 🎌")
+    print("[41ch] バックエンド起動完了 🎌")
+
+    # 中断シミュレーションの自動再開
+    interrupted = list_interrupted_simulations()
+    if interrupted:
+        print(f"[41ch] 中断シミュレーション {len(interrupted)}件 を検出 → 自動再開します")
+        from services.simulation_runner import run_simulation
+        for sim in interrupted:
+            sim_id = sim["id"]
+            print(f"[41ch] 再開: {sim_id[:8]} ({sim.get('theme', 'テーマ未設定')[:30]})")
+            # progressをリセットして再開（どのステップまで進んでいたかに関わらず最初から）
+            update_simulation(sim_id, status="simulating", progress=0.01)
+            asyncio.create_task(
+                run_simulation(
+                    sim_id=sim_id,
+                    seed_text=sim.get("theme", ""),
+                    prompt=sim.get("prompt", ""),
+                    scale=sim.get("scale", "mini"),
+                    custom_agents=sim.get("custom_agents"),
+                    custom_rounds=sim.get("custom_rounds"),
+                )
+            )
+    else:
+        print("[41ch] 中断シミュレーションなし")
 
 
 @app.get("/")

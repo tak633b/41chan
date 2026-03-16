@@ -234,9 +234,15 @@ async def get_agents(sim_id: str):
                 "gender": r["gender"],
                 "mbti": r["mbti"],
                 "tone_style": r["tone_style"],
+                "posting_style": r["posting_style"] if "posting_style" in r.keys() else "",
                 "profession": r["profession"],
                 "interested_topics": json.loads(r["interested_topics"] or "[]"),
                 "post_count": r["post_count"],
+                "emotional_wound": r["emotional_wound"] if "emotional_wound" in r.keys() else "",
+                "information_bias": r["information_bias"] if "information_bias" in r.keys() else "",
+                "speech_patterns": json.loads(r["speech_patterns"] or "[]") if "speech_patterns" in r.keys() else [],
+                "debate_tactics": r["debate_tactics"] if "debate_tactics" in r.keys() else "",
+                "social_position": r["social_position"] if "social_position" in r.keys() else "",
             }
         )
     return result

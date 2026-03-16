@@ -8,7 +8,9 @@ import asyncio
 import json
 import os
 import random
+import threading
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional
 
@@ -151,6 +153,11 @@ async def run_simulation(
                 "profession": a.profession,
                 "interested_topics": a.interested_topics,
                 "posting_style": getattr(a, "posting_style", "emotional"),
+                "emotional_wound": getattr(a, "emotional_wound", ""),
+                "information_bias": getattr(a, "information_bias", ""),
+                "speech_patterns": getattr(a, "speech_patterns", []),
+                "debate_tactics": getattr(a, "debate_tactics", ""),
+                "social_position": getattr(a, "social_position", ""),
             })
         save_persistent_agents(persistent_data)
         increment_agent_use_count([a.name for a in oracle_agents])
@@ -163,8 +170,9 @@ async def run_simulation(
                     """INSERT OR REPLACE INTO agents
                        (id, simulation_id, name, username, bio, persona, age, gender,
                         mbti, tone_style, profession, interested_topics, stance, hidden_agenda,
-                        posting_style)
-                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                        posting_style, emotional_wound, information_bias, speech_patterns,
+                        debate_tactics, social_position)
+                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                     (
                         str(uuid.uuid4()),
                         sim_id,
@@ -181,6 +189,11 @@ async def run_simulation(
                         json.dumps(a.stance, ensure_ascii=False),
                         a.hidden_agenda,
                         getattr(a, "posting_style", "emotional"),
+                        getattr(a, "emotional_wound", ""),
+                        getattr(a, "information_bias", ""),
+                        json.dumps(getattr(a, "speech_patterns", []), ensure_ascii=False),
+                        getattr(a, "debate_tactics", ""),
+                        getattr(a, "social_position", ""),
                     ),
                 )
 
@@ -212,13 +225,18 @@ async def run_simulation(
             print("[SimRunner] Step 3: 板自動生成開始", flush=True)
             boards_config = await loop.run_in_executor(
                 None,
-                lambda: generate_boards(entities, theme, key_issues, llm),
+                lambda: generate_boards(entities, theme, key_issues, llm, scale=scale),
             )
 
         # 板とスレッドをDBに保存
         board_db_map = {}  # board_name -> board_id
         thread_db_map = {}  # thread_title -> thread_id
         now = datetime.now().isoformat()
+
+        # boards/threads を先にDBへ全コミットしてから emit する
+        # （with db_conn() 内で await すると commit 前に posts INSERT が走り FOREIGN KEY エラーになる）
+        board_emit_queue = []   # (board_id, name, emoji, description)
+        thread_emit_queue = []  # (thread_id, board_id, title)
 
         with db_conn() as conn:
             for b in boards_config:
@@ -228,32 +246,27 @@ async def run_simulation(
                     "INSERT INTO boards (id, simulation_id, name, emoji, description, created_at) VALUES (?,?,?,?,?,?)",
                     (board_id, sim_id, b["name"], b["emoji"], b["description"], now),
                 )
-                await _emit(
-                    sim_id,
-                    "board_created",
-                    {
-                        "board_id": board_id,
-                        "name": b["name"],
-                        "emoji": b["emoji"],
-                        "description": b["description"],
-                    },
-                )
+                board_emit_queue.append((board_id, b["name"], b["emoji"], b["description"]))
                 for title in b.get("initial_threads", []):
+                    # initial_threads がdictのリストの場合に対応
+                    if isinstance(title, dict):
+                        title = title.get("title", title.get("name", str(title)))
                     thread_id = str(uuid.uuid4())
                     thread_db_map[title] = thread_id
                     conn.execute(
                         "INSERT INTO threads (id, board_id, simulation_id, title, is_active, created_at) VALUES (?,?,?,?,?,?)",
                         (thread_id, board_id, sim_id, title, 1, now),
                     )
-                    await _emit(
-                        sim_id,
-                        "thread_created",
-                        {
-                            "thread_id": thread_id,
-                            "board_id": board_id,
-                            "title": title,
-                        },
-                    )
+                    thread_emit_queue.append((thread_id, board_id, title))
+        # commit 完了後に emit
+        for board_id, name, emoji, description in board_emit_queue:
+            await _emit(sim_id, "board_created", {
+                "board_id": board_id, "name": name, "emoji": emoji, "description": description,
+            })
+        for thread_id, board_id, title in thread_emit_queue:
+            await _emit(sim_id, "thread_created", {
+                "thread_id": thread_id, "board_id": board_id, "title": title,
+            })
 
         update_simulation(
             sim_id,
@@ -287,85 +300,64 @@ async def run_simulation(
 
         total_posts_global = 0
         completed_threads = 0
+        _counter_lock = threading.Lock()  # 共有カウンタ保護用
 
-        # 板ごとにスレッドをループ
-        for board_idx, b_config in enumerate(boards_config):
+        # スレッド並列実行: mini=1, full/auto=2
+        MAX_PARALLEL = 1 if scale == "mini" else 4
+        semaphore = asyncio.Semaphore(MAX_PARALLEL)
+        print(f"[SimRunner] 並列度: {MAX_PARALLEL} (scale={scale})", flush=True)
+
+        # 全スレッドタスクを収集
+        all_thread_tasks = []
+        for b_config in boards_config:
             board_name = b_config["name"]
             board_id = board_db_map.get(board_name)
             if not board_id:
                 continue
+            for thread_title in b_config.get("initial_threads", []):
+                if isinstance(thread_title, dict):
+                    thread_title = thread_title.get("title", thread_title.get("name", str(thread_title)))
+                thread_id = thread_db_map.get(thread_title)
+                if thread_id:
+                    all_thread_tasks.append((board_name, board_id, thread_title, thread_id))
 
-            threads_in_board = b_config.get("initial_threads", [])
-            if not threads_in_board:
-                continue
+        async def _run_one_thread(board_name: str, board_id: str, thread_title: str, thread_id: str):
+            """1スレッド分のシミュレーション（独立LLMクライアント）"""
+            nonlocal total_posts_global, completed_threads
 
-            print(f"[SimRunner] 板: {board_name} ({len(threads_in_board)}スレッド)", flush=True)
-
-            # スレッドごとにBoardSimulatorを実行
-            for thread_title in threads_in_board:
-                # 一時停止チェック（各スレッド/ラウンドの前）
+            async with semaphore:
+                # 一時停止チェック
                 _check = get_simulation(sim_id)
                 if _check and _check.get("status") == "paused":
-                    print(f"[SimRunner] シミュレーション {sim_id} は一時停止中です (Step 4: {thread_title}前)")
+                    print(f"[SimRunner] 一時停止中のためスキップ: {thread_title}")
                     return
 
-                thread_id = thread_db_map.get(thread_title)
-                if not thread_id:
-                    completed_threads += 1
-                    continue
+                print(f"[SimRunner]   スレッド開始: [{board_name}] {thread_title}", flush=True)
+                _emit_sync(sim_id, "round_start", {
+                    "round_num": 1, "board": board_name, "thread": thread_title,
+                })
 
-                print(f"[SimRunner]   スレッド: {thread_title}", flush=True)
-                _emit_sync(
-                    sim_id,
-                    "round_start",
-                    {
-                        "round_num": 1,
-                        "board": board_name,
-                        "thread": thread_title,
-                    },
-                )
+                # スレッドごとに独立したLLMクライアント（_last_call_time競合なし）
+                thread_llm = OracleLLMClient()
+                thread_memory = MemoryManager(db_dir=db_dir_abs, project_id=sim_id, llm=thread_llm)
 
-                # スレッド専用のBoardSimulatorを作成
-                # board_name と thread_title を渡すことで、
-                # スレタイに沿った5ch文化のシミュレーションを実行
-                simulator = BoardSimulator(
-                    agents=oracle_agents,
-                    entity_data=entity_data,
-                    question=prompt,
-                    memory_manager=memory,
-                    llm=llm,
-                    scale=scale,
-                    custom_rounds=custom_rounds,
-                    board_name=board_name,
-                    thread_title=thread_title,
-                    rounds_per_thread=rounds_per_thread if scale == "auto" else None,
-                )
+                # リアルタイム投稿コールバック（DB保存 + SSE emit）
+                post_counter_ref = [0]  # ミュータブルなカウンター
 
-                try:
-                    await loop.run_in_executor(None, simulator.run)
-                except Exception as e:
-                    print(f"[SimRunner] スレッド '{thread_title}' シミュレーション失敗: {e}")
-                    completed_threads += 1
-                    continue
+                def _on_post(p: dict):
+                    post_counter_ref[0] += 1
+                    post_num = post_counter_ref[0]
+                    post_id = str(uuid.uuid4())
+                    ts = p.get("timestamp", datetime.now().strftime("%Y/%m/%d %H:%M"))
 
-                # 投稿をDBに保存（全投稿がこのスレッドへ）
-                with db_conn() as conn:
-                    for post_idx, p in enumerate(simulator.posts):
-                        post_num = post_idx + 1  # スレッド内の1-indexed連番
-                        post_id = str(uuid.uuid4())
-                        ts = p.get("timestamp", datetime.now().strftime("%Y/%m/%d %H:%M"))
-
+                    with db_conn() as conn:
                         conn.execute(
                             """INSERT INTO posts
                                (id, thread_id, board_id, simulation_id, post_num, agent_name,
                                 username, content, reply_to, emotion, round_num, timestamp, created_at)
                                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                             (
-                                post_id,
-                                thread_id,
-                                board_id,
-                                sim_id,
-                                post_num,
+                                post_id, thread_id, board_id, sim_id, post_num,
                                 p.get("agent_name", ""),
                                 p.get("username", "名無し"),
                                 p.get("content", ""),
@@ -376,61 +368,88 @@ async def run_simulation(
                                 datetime.now().isoformat(),
                             ),
                         )
-
                         conn.execute(
                             "UPDATE agents SET post_count = post_count + 1 WHERE simulation_id=? AND name=?",
                             (sim_id, p.get("agent_name", "")),
                         )
-
                         conn.execute(
                             "UPDATE threads SET last_post_at=? WHERE id=?", (ts, thread_id)
                         )
 
-                        await _emit(
-                            sim_id,
-                            "new_post",
-                            {
-                                "board_id": board_id,
-                                "thread_id": thread_id,
-                                "board_name": board_name,
-                                "thread_title": thread_title,
-                                "post": {
-                                    "post_id": post_id,
-                                    "post_num": post_num,
-                                    "agent_name": p.get("agent_name", ""),
-                                    "username": p.get("username", "名無し"),
-                                    "content": p.get("content", ""),
-                                    "reply_to": p.get("anchor_to"),
-                                    "timestamp": ts,
-                                    "emotion": p.get("emotion", "neutral"),
-                                },
-                            },
-                        )
-                        total_posts_global += 1
+                    # 書き込み中プレースホルダー
+                    _emit_sync(sim_id, "post_thinking", {
+                        "board_id": board_id,
+                        "thread_id": thread_id,
+                        "agent_name": p.get("agent_name", ""),
+                        "username": p.get("username", "名無し"),
+                        "post_num": post_num,
+                    })
+                    import time as _time
+                    _time.sleep(0.3 + (hash(post_id) % 6) * 0.1)
 
-                completed_threads += 1
-                progress = 0.30 + 0.55 * (completed_threads / max(1, total_threads_all))
-                update_simulation(
-                    sim_id,
-                    total_posts=total_posts_global,
-                    progress=progress,
+                    _emit_sync(sim_id, "new_post", {
+                        "board_id": board_id, "thread_id": thread_id,
+                        "board_name": board_name, "thread_title": thread_title,
+                        "post": {
+                            "post_id": post_id, "post_num": post_num,
+                            "agent_name": p.get("agent_name", ""),
+                            "username": p.get("username", "名無し"),
+                            "content": p.get("content", ""),
+                            "reply_to": p.get("anchor_to"),
+                            "timestamp": ts,
+                            "emotion": p.get("emotion", "neutral"),
+                        },
+                    })
+
+                simulator = BoardSimulator(
+                    agents=oracle_agents,
+                    entity_data=entity_data,
+                    question=prompt,
+                    memory_manager=thread_memory,
+                    llm=thread_llm,
+                    scale=scale,
+                    custom_rounds=custom_rounds,
+                    board_name=board_name,
+                    thread_title=thread_title,
+                    rounds_per_thread=rounds_per_thread if scale == "auto" else None,
+                    on_post_generated=_on_post,
                 )
+                simulator.sim_id = sim_id  # 過去シミュ除外用
 
-                await _emit(
-                    sim_id,
-                    "round_complete",
-                    {
-                        "round_num": simulator.num_rounds,
-                        "post_count": len(simulator.posts),
-                        "board": board_name,
-                        "thread": thread_title,
-                    },
-                )
+                try:
+                    await loop.run_in_executor(None, simulator.run)
+                except Exception as e:
+                    print(f"[SimRunner] スレッド '{thread_title}' 失敗: {e}")
+                    with _counter_lock:
+                        completed_threads += 1
+                    return
 
+                with _counter_lock:
+                    total_posts_global += len(simulator.posts)
+                    completed_threads += 1
+                    _done = completed_threads
+                    _total_g = total_posts_global
+
+                progress = 0.30 + 0.55 * (_done / max(1, total_threads_all))
+                update_simulation(sim_id, total_posts=_total_g, progress=progress)
+
+                await _emit(sim_id, "round_complete", {
+                    "round_num": simulator.num_rounds,
+                    "post_count": len(simulator.posts),
+                    "board": board_name, "thread": thread_title,
+                })
                 print(
-                    f"[SimRunner]   完了: {len(simulator.posts)}投稿 (累計: {total_posts_global})",
+                    f"[SimRunner]   完了: [{board_name}] {thread_title} "
+                    f"({len(simulator.posts)}投稿, 累計{_total_g}, {_done}/{total_threads_all}スレッド)",
                     flush=True,
                 )
+
+        # 全スレッドを並列実行（Semaphoreで同時実行数を制御）
+        print(f"[SimRunner] Step 4: {total_threads_all}スレッドを並列実行開始 (並列度={MAX_PARALLEL})", flush=True)
+        await asyncio.gather(*[
+            _run_one_thread(bn, bid, tt, tid)
+            for bn, bid, tt, tid in all_thread_tasks
+        ])
 
         update_simulation(sim_id, status="reporting", progress=0.88)
 

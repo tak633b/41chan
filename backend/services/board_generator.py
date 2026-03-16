@@ -20,6 +20,7 @@ def generate_boards(
     theme: str,
     key_issues: List[str],
     llm: OracleLLMClient,
+    scale: str = "full",
 ) -> List[Dict[str, Any]]:
     """
     テーマから板構成を自動生成する。
@@ -74,4 +75,13 @@ def generate_boards(
         )
 
     # 3〜6板に収める
-    return validated[:6] if len(validated) > 6 else validated
+    result_boards = validated[:6] if len(validated) > 6 else validated
+
+    # miniスケール: 板1つ・スレ1つに強制
+    if scale == "mini":
+        if result_boards:
+            first_board = result_boards[0]
+            first_board["initial_threads"] = first_board["initial_threads"][:1] if first_board.get("initial_threads") else [f"【{first_board['name']}】スレ"]
+            return [first_board]
+        return result_boards
+    return result_boards

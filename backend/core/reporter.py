@@ -94,8 +94,14 @@ def generate_report(
     question: str,
     theme: str,
     llm: OracleLLMClient,
+    cooldown_sec: float = 10.0,
 ) -> Dict[str, Any]:
     """2段階でレポート生成"""
+    # 並列スレッド処理直後にOllamaが高負荷な場合があるため冷却待機
+    if cooldown_sec > 0:
+        import time as _t
+        print(f"[Reporter] Ollama冷却待機 {cooldown_sec:.0f}秒...", flush=True)
+        _t.sleep(cooldown_sec)
     # ログ要約
     max_log_chars = 6000
     if len(thread_log) > max_log_chars:
@@ -118,7 +124,7 @@ def generate_report(
 
     result = {}
     try:
-        result = llm.chat_json(step1_messages, temperature=0.3)
+        result = llm.chat_json(step1_messages, temperature=0.3, num_predict=4096)
         print(f"[Reporter] Step1 成功: confidence={result.get('confidence')}", flush=True)
     except Exception as e:
         print(f"[Reporter] Step1 失敗: {e}", flush=True)
@@ -136,7 +142,7 @@ def generate_report(
     ]
 
     try:
-        details = llm.chat(step2_messages, temperature=0.4)
+        details = llm.chat(step2_messages, temperature=0.4, num_predict=4096)
         # thinkingタグ除去
         details = re.sub(r"<think>[\s\S]*?</think>", "", details).strip()
         if "<think>" in details:
