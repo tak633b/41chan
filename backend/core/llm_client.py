@@ -223,7 +223,8 @@ class OracleLLMClient:
         if start == -1:
             raise ValueError(f"レスポンス中にJSONが見つかりませんでした: {content[:200]}")
 
-        depth = 0
+        # スタックで開き括弧を追跡（閉じる順序を正確に復元するため）
+        bracket_stack: List[str] = []
         in_string = False
         escape_next = False
         for i in range(start, len(cleaned)):
@@ -238,12 +239,13 @@ class OracleLLMClient:
                 in_string = not in_string
                 continue
             if in_string:
-                continue  # 文字列内の { } はカウントしない
+                continue  # 文字列内の括弧はスタックに積まない
             if ch == "{":
-                depth += 1
+                bracket_stack.append("{")
             elif ch == "}":
-                depth -= 1
-                if depth == 0:
+                if bracket_stack and bracket_stack[-1] == "{":
+                    bracket_stack.pop()
+                if not bracket_stack:
                     json_str = cleaned[start:i+1]
                     try:
                         return json.loads(json_str)
@@ -254,27 +256,35 @@ class OracleLLMClient:
                             return json.loads(json_str_clean)
                         except json.JSONDecodeError:
                             continue  # 次の {} ペアを試す
+            elif ch == "[":
+                bracket_stack.append("[")
+            elif ch == "]":
+                if bracket_stack and bracket_stack[-1] == "[":
+                    bracket_stack.pop()
 
         # 不完全なJSON修復（トークン上限で切れた場合）
-        if start != -1 and depth > 0:
-            # 末尾の不完全な値を切り捨てて閉じる
+        if start != -1 and bracket_stack:
             truncated = cleaned[start:]
-            # 末尾の不完全キー/値を除去（最後のカンマ以降）
+            # 文字列途中で切れている場合は閉じクォートを補完
+            if in_string:
+                truncated += '"'
+            # スタックの逆順で閉じ括弧を生成（正しい閉じ順）
+            closing = "".join("}" if c == "{" else "]" for c in reversed(bracket_stack))
+            # まず末尾の不完全な値をカンマで切り捨てて閉じる
             for trim in [',\n', ', ', ',']:
                 last_comma = truncated.rfind(trim)
                 if last_comma > 0:
-                    candidate = truncated[:last_comma]
-                    candidate += "}" * depth
+                    candidate = truncated[:last_comma] + closing
                     candidate = re.sub(r"[\x00-\x1f\x7f-\x9f]", " ", candidate)
                     try:
                         return json.loads(candidate)
                     except json.JSONDecodeError:
                         continue
             # カンマ切り捨てでダメなら、そのまま閉じ括弧を追加
-            truncated += "}" * depth
-            truncated = re.sub(r"[\x00-\x1f\x7f-\x9f]", " ", truncated)
+            candidate = truncated + closing
+            candidate = re.sub(r"[\x00-\x1f\x7f-\x9f]", " ", candidate)
             try:
-                return json.loads(truncated)
+                return json.loads(candidate)
             except json.JSONDecodeError:
                 pass
 

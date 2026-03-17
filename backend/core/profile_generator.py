@@ -661,7 +661,23 @@ def _stock_agent_to_oracle(s: dict, idx: int, total: int, key_issues: list, stan
 
 
 def _try_reuse_stock_agents(agent_count: int, key_issues: list) -> List[OracleAgent]:
-    """ストックエージェントからランダム選択して OracleAgent リストを返す"""
+    """ストックエージェントからランダム選択して OracleAgent リストを返す。
+    DBにエージェントが存在する場合はDBのis_activeを優先する。"""
+    # まずDBからアクティブなエージェントを取得（is_active=1 のみ）
+    try:
+        from db.database import get_persistent_agents
+        db_agents = [a for a in get_persistent_agents(limit=200, include_bad=False) if a.get("is_active", 1) == 1]
+        if db_agents:
+            selected = random.sample(db_agents, min(agent_count, len(db_agents)))
+            agents = []
+            for idx, row in enumerate(selected):
+                agents.append(_row_to_agent(row, idx, len(selected), key_issues))
+            print(f"[ProfileGenerator] 📦 ストックエージェント(DB) {len(agents)}名を選択 (アクティブ:{len(db_agents)}名中)")
+            return agents
+    except Exception as e:
+        print(f"[ProfileGenerator] DB取得失敗、JSONフォールバック: {e}")
+
+    # DBが空またはエラーの場合はstock_agents.jsonから読み込み
     stock = _load_stock_agents()
     if not stock:
         return []
@@ -669,7 +685,7 @@ def _try_reuse_stock_agents(agent_count: int, key_issues: list) -> List[OracleAg
     agents = []
     for idx, s in enumerate(selected):
         agents.append(_stock_agent_to_oracle(s, idx, len(selected), key_issues))
-    print(f"[ProfileGenerator] 📦 ストックエージェント {len(agents)}名を選択")
+    print(f"[ProfileGenerator] 📦 ストックエージェント(JSON) {len(agents)}名を選択")
     return agents
 
 
