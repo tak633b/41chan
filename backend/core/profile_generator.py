@@ -610,17 +610,21 @@ _stock_agents_cache: Optional[List[dict]] = None
 
 
 def _load_stock_agents() -> List[dict]:
-    """stock_agents.json を一度だけ読み込んでキャッシュ"""
+    """stock_agents.json と stock_agents_real.json を結合して一度だけ読み込んでキャッシュ"""
     global _stock_agents_cache
     if _stock_agents_cache is None:
-        path = _os.path.abspath(_STOCK_AGENTS_PATH)
-        if _os.path.exists(path):
-            with open(path, "r", encoding="utf-8") as f:
-                _stock_agents_cache = json.load(f)
-            print(f"[ProfileGenerator] ✅ ストックエージェント {len(_stock_agents_cache)}名を読み込み")
-        else:
-            _stock_agents_cache = []
-            print(f"[ProfileGenerator] ⚠️ stock_agents.json が見つかりません: {path}")
+        agents_dir = _os.path.abspath(_os.path.join(_os.path.dirname(__file__), "..", "agents"))
+        _stock_agents_cache = []
+        for fname in ["stock_agents.json", "stock_agents_real.json"]:
+            fpath = _os.path.join(agents_dir, fname)
+            if _os.path.exists(fpath):
+                with open(fpath, "r", encoding="utf-8") as f:
+                    loaded = json.load(f)
+                _stock_agents_cache.extend(loaded)
+                print(f"[ProfileGenerator] ✅ {fname} から {len(loaded)}名を読み込み")
+            else:
+                print(f"[ProfileGenerator] ℹ️ {fname} が見つかりません（スキップ）")
+        print(f"[ProfileGenerator] ✅ ストックエージェント合計 {len(_stock_agents_cache)}名を読み込み")
     return _stock_agents_cache
 
 

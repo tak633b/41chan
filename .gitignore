@@ -11,3 +11,8 @@ __pycache__/
 *.db-shm
 *.db-wal
 memory_*.db
+
+# 実在スタッフ情報（非公開）
+backend/agents/stock_agents_real.json
+backend/agents/stock_agents_real_batch*.json
+backend/agents/stock_agents_backup_*.json
