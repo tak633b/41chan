@@ -1,7 +1,7 @@
 """
-Oracle レポーター
-スレッドログ + エージェント記憶 → 分析レポート生成。
-2段階生成: Step1=構造化データ(JSON), Step2=詳細分析(テキスト)
+41chan Reporter
+Thread log + agent memories -> analysis report generation.
+2-stage generation: Step1=structured data (JSON), Step2=detailed analysis (text)
 """
 
 import json
@@ -10,87 +10,87 @@ from typing import List, Dict, Any
 from .llm_client import OracleLLMClient
 from .profile_generator import OracleAgent
 
-# --- Step 1: 構造化データ ---
-STEP1_SYSTEM = """掲示板シミュレーション分析の専門家。JSON形式のみで回答する。"""
+# --- Step 1: Structured data ---
+STEP1_SYSTEM = """You are an expert analyst of imageboard simulation discussions. Reply in JSON format only. All text must be in English."""
 
-STEP1_USER = """以下の掲示板ログを分析してください。
+STEP1_USER = """Analyze the following imageboard thread log.
 
-【議題】{question}
-【テーマ】{theme}
-【エージェント】{agent_list}
+[Topic] {question}
+[Theme] {theme}
+[Agents] {agent_list}
 
-【ログ抜粋】
+[Thread Log Excerpt]
 {thread_log_excerpt}
 
-以下のJSONで返してください:
+Return the following JSON:
 {{
-  "summary": "結論・要旨（200-300字）",
+  "summary": "conclusion/summary (200-300 chars)",
   "confidence": 0.0-1.0,
-  "key_findings": ["発見1", "発見2", "発見3"],
-  "agent_positions": {{"名前": "賛成/反対/中立/懐疑 — 理由"}},
-  "turning_points": ["転換点1", "転換点2"],
-  "consensus": "高/中/低 — 説明",
-  "minority_views": ["少数意見1"],
-  "prediction": "予測（100字以内）",
+  "key_findings": ["finding 1", "finding 2", "finding 3"],
+  "agent_positions": {{"name": "pro/con/neutral/skeptical — reason"}},
+  "turning_points": ["turning point 1", "turning point 2"],
+  "consensus": "high/medium/low — explanation",
+  "minority_views": ["minority view 1"],
+  "prediction": "prediction (under 100 chars)",
   "consensus_score": 0.0-1.0
 }}"""
 
-# --- Step 2: 詳細分析 ---
-STEP2_SYSTEM = """あなたはバーチャル並行世界シミュレーターの記録官です。
-シミュレーション空間内で「実際に起きた出来事」として、未来予測レポートを執筆してください。
-書き方の原則:
-- 「〜が議論された」ではなく「〜が形成された」「〜が可視化された」「〜が生まれた」等、出来事として描写
-- 住民の発言を [>>投稿番号@板名] 形式で引用し、証拠として埋め込む
-- 現在形・分析口調を避け、過去形・記録口調で書く
-- 全体を通じて「この世界線では〜が起きた」という臨場感を維持する"""
+# --- Step 2: Detailed analysis ---
+STEP2_SYSTEM = """You are the chronicler of a virtual parallel-world simulator.
+Write a future prediction report as if you are documenting "events that actually happened" inside the simulation space.
+Writing principles:
+- Use "was formed", "became visible", "emerged" etc. instead of "was discussed"
+- Cite anon posts as [>>post_number@board_name] embedded as evidence
+- Write in past tense / chronicle style, avoid present tense / analytical tone
+- Maintain the immersion that "in this timeline, X happened" throughout"""
 
-STEP2_USER = """以下の掲示板ログをもとに、バーチャル並行世界の予測レポートを日本語で執筆してください。
+STEP2_USER = """Based on the following imageboard thread log, write a virtual parallel-world prediction report in English.
 
-【シミュレーション議題】{question}
-【世界テーマ】{theme}
-【観測期間の要旨】{summary}
-【時間軸】{time_horizon}後の並行世界
+[Simulation Topic] {question}
+[World Theme] {theme}
+[Observation Period Summary] {summary}
+[Timeline] Parallel world {time_horizon} from now
 
-【掲示板ログ】
+[Thread Log]
 {thread_log_excerpt}
 
-以下の構成で2000字程度のレポートを書いてください（JSON不要、テキストのみ）:
+Write a ~2000 word report with the following structure (no JSON, text only):
 
 01
 {section1_title}
-（この世界線で「功利主義的適応」「抜け道」「同調圧力」「予期せぬ連帯」など、テーマに合った現象がどう展開したか。発言引用 [>>N@板名] を3〜5個埋め込む）
+(How phenomena fitting the theme — utilitarian adaptation, workarounds, social pressure, unexpected solidarity — unfolded in this timeline. Embed 3-5 post citations [>>N@board_name])
 
 02
 {section2_title}
-（対立・軋轢・不満が可視化されたプロセスと、それが生んだ構造変化。引用2〜3個）
+(The process by which conflicts, friction, and discontent became visible, and the structural changes they produced. 2-3 citations)
 
 03
 {section3_title}
-（この世界線が示す未来への示唆・構造的な問題点。引用1〜2個）
+(Implications for the future and structural problems revealed by this timeline. 1-2 citations)
 
-セクションタイトルは議題・テーマに合わせて自由に設定してください。"""
+Section titles should be set freely to match the topic and theme."""
 
 
 def _calc_stance_distribution(agents: List[OracleAgent], agent_positions: Dict[str, str]) -> Dict[str, int]:
-    """エージェントの立場分布をカウント"""
-    dist = {"賛成": 0, "反対": 0, "中立": 0, "懐疑": 0}
+    """Count stance distribution across agents"""
+    dist = {"pro": 0, "con": 0, "neutral": 0, "skeptical": 0}
     for a in agents:
         pos_text = agent_positions.get(a.name, "")
         stance_val = a.stance.get("position", "")
         combined = f"{pos_text} {stance_val}".lower()
-        if "賛成" in combined or "推進" in combined:
-            dist["賛成"] += 1
-        elif "反対" in combined or "批判" in combined:
-            dist["反対"] += 1
-        elif "懐疑" in combined or "疑問" in combined:
-            dist["懐疑"] += 1
+        if "pro" in combined or "support" in combined or "for" in combined:
+            dist["pro"] += 1
+        elif "con" in combined or "against" in combined or "oppose" in combined:
+            dist["con"] += 1
+        elif "skeptic" in combined or "doubt" in combined or "question" in combined:
+            dist["skeptical"] += 1
         else:
-            dist["中立"] += 1
+            dist["neutral"] += 1
     return dist
 
 
 def _calc_activity_by_round(project_id: str) -> List[int]:
-    """ラウンドごとの投稿数をDBから取得"""
+    """Get post count per round from DB"""
     try:
         from db.database import db_conn
         with db_conn() as conn:
@@ -104,14 +104,13 @@ def _calc_activity_by_round(project_id: str) -> List[int]:
 
 
 def _select_representative_posts(thread_log: str, max_posts: int = 50) -> str:
-    """代表投稿を選定（emotion!=neutralを優先、次にanchor_toあり、残りで補充）"""
+    """Select representative posts (prioritize emotion!=neutral, then anchor replies, fill with normal)"""
     lines = thread_log.strip().split("\n")
 
-    # 投稿ブロックをパース（簡易: 番号で始まる行を投稿開始とみなす）
+    # Parse post blocks (simple: lines starting with digit are new posts)
     posts = []
     current_post = []
     for line in lines:
-        # "数字: " で始まる行は新しい投稿の開始
         stripped = line.strip()
         if stripped and len(stripped) > 2 and stripped[0].isdigit() and ": " in stripped[:10]:
             if current_post:
@@ -121,7 +120,7 @@ def _select_representative_posts(thread_log: str, max_posts: int = 50) -> str:
             if current_post:
                 posts.append("\n".join(current_post))
                 current_post = []
-            posts.append(line)  # ヘッダー行はそのまま保持
+            posts.append(line)  # Keep header lines as-is
         else:
             current_post.append(line)
     if current_post:
@@ -130,7 +129,7 @@ def _select_representative_posts(thread_log: str, max_posts: int = 50) -> str:
     if len(posts) <= max_posts:
         return thread_log
 
-    # 分類: ヘッダー行、感情的投稿、アンカー付き投稿、通常投稿
+    # Classify: header lines, emotional posts, anchored posts, normal posts
     headers = []
     emotional = []
     anchored = []
@@ -145,7 +144,7 @@ def _select_representative_posts(thread_log: str, max_posts: int = 50) -> str:
         else:
             normal.append(post)
 
-    # 選定: headers + emotional優先 + anchored + normalで50件に
+    # Select: headers + emotional first + anchored + normal up to 50 posts
     selected = headers[:]
     remaining = max_posts - len(selected)
     for pool in [emotional, anchored, normal]:
@@ -166,30 +165,30 @@ def generate_report(
     theme: str,
     llm: OracleLLMClient,
     cooldown_sec: float = 10.0,
-    time_horizon: str = "3ヶ月",
+    time_horizon: str = "3 months",
 ) -> Dict[str, Any]:
-    """2段階でレポート生成"""
-    # ZAIバックエンド使用時は冷却不要（Ollamaのみ必要）
+    """Generate report in 2 stages"""
+    # ZAI backend: no cooldown needed (only Ollama needs it)
     effective_cooldown = 0.0 if llm.backend == "zai" else cooldown_sec
     if effective_cooldown > 0:
         import time as _t
-        print(f"[Reporter] Ollama冷却待機 {effective_cooldown:.0f}秒...", flush=True)
+        print(f"[Reporter] Ollama cooldown wait {effective_cooldown:.0f}s...", flush=True)
         _t.sleep(effective_cooldown)
 
-    # 代表投稿（最大50件）を選定してコンテキストサイズを削減
+    # Select representative posts (max 50) to reduce context size
     thread_log_selected = _select_representative_posts(thread_log, max_posts=50)
 
-    # ログ要約
+    # Log excerpt
     max_log_chars = 6000
     if len(thread_log_selected) > max_log_chars:
         half = max_log_chars // 2
-        thread_log_excerpt = thread_log_selected[:half] + "\n\n... [中略] ...\n\n" + thread_log_selected[-half:]
+        thread_log_excerpt = thread_log_selected[:half] + "\n\n... [truncated] ...\n\n" + thread_log_selected[-half:]
     else:
         thread_log_excerpt = thread_log_selected
 
     agent_list = ", ".join([f"{a.name}({a.tone_style})" for a in agents])
 
-    # --- Step 1: 構造化データ ---
+    # --- Step 1: Structured data ---
     step1_messages = [
         {"role": "system", "content": STEP1_SYSTEM},
         {"role": "user", "content": STEP1_USER.format(
@@ -202,12 +201,12 @@ def generate_report(
     result = {}
     try:
         result = llm.chat_json(step1_messages, temperature=0.3, num_predict=4096)
-        print(f"[Reporter] Step1 成功: confidence={result.get('confidence')}", flush=True)
+        print(f"[Reporter] Step1 success: confidence={result.get('confidence')}", flush=True)
     except Exception as e:
-        print(f"[Reporter] Step1 失敗: {e}", flush=True)
+        print(f"[Reporter] Step1 failed: {e}", flush=True)
         result = _fallback_step1(agents, question, theme)
 
-    # --- Step 2: 詳細分析 ---
+    # --- Step 2: Detailed analysis ---
     summary = result.get("summary", "")
     step2_messages = [
         {"role": "system", "content": STEP2_SYSTEM},
@@ -216,25 +215,25 @@ def generate_report(
             summary=summary,
             thread_log_excerpt=thread_log_excerpt,
             time_horizon=time_horizon,
-            section1_title="（タイトルを自由に決めてください）",
-            section2_title="（タイトルを自由に決めてください）",
-            section3_title="（タイトルを自由に決めてください）",
+            section1_title="(Choose a title freely)",
+            section2_title="(Choose a title freely)",
+            section3_title="(Choose a title freely)",
         )},
     ]
 
     try:
         details = llm.chat(step2_messages, temperature=0.4, num_predict=4096)
-        # thinkingタグ除去
+        # Remove thinking tags
         details = re.sub(r"<think>[\s\S]*?</think>", "", details).strip()
         if "<think>" in details:
             details = re.sub(r"<think>[\s\S]*", "", details).strip()
-        print(f"[Reporter] Step2 成功: {len(details)}字", flush=True)
+        print(f"[Reporter] Step2 success: {len(details)} chars", flush=True)
         result["details"] = details
     except Exception as e:
-        print(f"[Reporter] Step2 失敗: {e}", flush=True)
-        result.setdefault("details", f"テーマ「{theme}」について{len(agents)}エージェントによる掲示板シミュレーションを実施しました。")
+        print(f"[Reporter] Step2 failed: {e}", flush=True)
+        result.setdefault("details", f"A simulation on the theme '{theme}' was conducted with {len(agents)} agents.")
 
-    # --- DB計算フィールド ---
+    # --- DB computed fields ---
     agent_positions = result.get("agent_positions", {})
     if not isinstance(agent_positions, dict):
         agent_positions = {}
@@ -242,13 +241,13 @@ def generate_report(
     result["stance_distribution"] = _calc_stance_distribution(agents, agent_positions)
     result["activity_by_round"] = _calc_activity_by_round(project_id)
 
-    # デフォルト補完
-    result.setdefault("summary", f"「{question}」に関するシミュレーション結果。{len(agents)}エージェントが議論に参加。")
+    # Set defaults
+    result.setdefault("summary", f"Simulation results for '{question}'. {len(agents)} agents participated.")
     result.setdefault("confidence", 0.5)
     result.setdefault("key_findings", [])
     result.setdefault("agent_positions", {})
     result.setdefault("turning_points", [])
-    result.setdefault("consensus", "不明")
+    result.setdefault("consensus", "unknown")
     result.setdefault("minority_views", [])
     result.setdefault("prediction", "")
     result.setdefault("consensus_score", float(result.get("confidence", 0.5)))
@@ -257,21 +256,21 @@ def generate_report(
 
 
 def _fallback_step1(agents, question, theme):
-    """LLM失敗時のフォールバック"""
+    """Fallback when LLM fails"""
     positions = {}
     for a in agents:
-        pos = a.stance.get("position", "中立")
+        pos = a.stance.get("position", "neutral")
         positions[a.name] = pos
     return {
-        "summary": f"「{question}」に関するシミュレーション結果。{len(agents)}エージェントが議論に参加しました。",
-        "details": f"テーマ「{theme}」について{len(agents)}エージェントによる掲示板シミュレーションを実施しました。",
+        "summary": f"Simulation results for '{question}'. {len(agents)} agents participated.",
+        "details": f"A simulation on the theme '{theme}' was conducted with {len(agents)} agents.",
         "confidence": 0.4,
-        "key_findings": [f"エージェント数: {len(agents)}"],
+        "key_findings": [f"Agent count: {len(agents)}"],
         "agent_positions": positions,
         "turning_points": [],
-        "consensus": "不明",
+        "consensus": "unknown",
         "minority_views": [],
-        "prediction": "レポート生成に失敗しました。スレッドログを直接参照してください。",
+        "prediction": "Report generation failed. Please refer to the thread log directly.",
     }
 
 
@@ -280,7 +279,7 @@ def format_report_markdown(
     theme: str,
     question: str,
 ) -> str:
-    """レポートをMarkdown形式に整形（vault保存用）"""
+    """Format report as Markdown (for vault storage)"""
     agent_positions = "\n".join(
         f"- **{name}**: {pos}"
         for name, pos in report.get("agent_positions", {}).items()
@@ -295,37 +294,37 @@ def format_report_markdown(
         f"- {v}" for v in report.get("minority_views", [])
     )
 
-    return f"""# Oracle シミュレーションレポート
+    return f"""# 41chan Simulation Report
 
-## テーマ
+## Theme
 {theme}
 
-## 議題
+## Topic
 {question}
 
-**確信度**: {report['confidence']:.0%}
+**Confidence**: {report['confidence']:.0%}
 
-## 結論・要旨
+## Summary
 {report['summary']}
 
-## 詳細分析
+## Detailed Analysis
 {report['details']}
 
-## 主要な発見
+## Key Findings
 {key_findings}
 
-## エージェントの立場
+## Agent Positions
 {agent_positions}
 
-## 議論の転換点
+## Discussion Turning Points
 {turning_points}
 
-## 合意形成
-{report.get('consensus', '不明')}
+## Consensus Formation
+{report.get('consensus', 'unknown')}
 
-## 少数意見
+## Minority Views
 {minority_views}
 
-## 予測
+## Prediction
 {report.get('prediction', '')}
 """

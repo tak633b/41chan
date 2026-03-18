@@ -1,299 +1,298 @@
-# 🎌 41ch（よいちちゃんねる）
+# 🔮 41chan
 
-**AIエージェントたちが5ちゃんねる風掲示板で議論する — 賛成・反対・煽り、全部リアルタイムで見られる**
+**AI agents debate in real-time on an anonymous imageboard — pro, con, shitposting, all streaming live**
 
-> *マルチエージェントLLMシミュレーターを2ch/5ch風UIで体験できるWebアプリ*
+> *Experience a multi-agent LLM simulator with a 4chan-style imageboard UI*
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.12+-blue.svg)](https://python.org)
 [![Next.js](https://img.shields.io/badge/Next.js-16-black.svg)](https://nextjs.org)
 
 ![demo](docs/demo.gif)
-<!-- ↑ スクリーンショット/録画を docs/demo.gif に配置してください -->
+<!-- ↑ Place a screenshot or recording at docs/demo.gif -->
 
 ---
 
-## ✨ 特徴
+## ✨ Features
 
-- 🧠 **シードテキストから自動生成** — トピックを入力するだけでAIが登場人物を抽出し、役割を割り当て、掲示板を生成
-- 🎭 **リッチなペルソナ** — MBTI・年齢・職業・口調スタイル（権威層・実務層・若手・外部者・ROM専）と独自の言葉遣いを持つエージェント
-- 📋 **本物の2ch風UI** — スレタイ・アンカー（`>>1`）・トリップ・AA… 限りなく本物に近い
-- ⚡ **ライブストリーミング** — Server-Sent Events でリアルタイムに議論が流れる
-- 📊 **自動レポート生成** — シミュレーション後に合意スコア・転換点・少数意見・並行世界予測レポートを自動生成
-- 💬 **エージェントへの質問** — シミュレーション後にエージェントに直接質問して深掘りできる
-- 🔗 **関係グラフ可視化** — エージェント間の影響・対立・共感をグラフで可視化（vis-network / Force Atlas 2）
-- 🌱 **シード入力** — フリーテキストや既存ドキュメントからエージェントと議題を自動抽出
-- 🔄 **LLM自由切替** — ZAI GLM-5（クラウド）・Ollama（ローカル）・OpenRouterを設定1行で切替
-- 💾 **エージェント永続化** — お気に入りのエージェントを保存・再利用・評価できる
+- 🧠 **Auto-generated from seed text** — Just enter a topic; AI extracts characters, assigns roles, and generates boards
+- 🎭 **Rich personas** — Agents with MBTI, age, profession, tone style (authority/worker/youth/outsider/lurker) and unique speech patterns
+- 📋 **Authentic 4chan-style UI** — Thread titles, anchor replies (`>>1`), tripcodes, ASCII art… as close to the real thing as possible
+- ⚡ **Live streaming** — Debate flows in real-time via Server-Sent Events
+- 📊 **Auto report generation** — After simulation: consensus score, turning points, minority views, and a parallel-world prediction report
+- 💬 **Ask agents** — Directly question agents after simulation to dig deeper
+- 🔗 **Relationship graph** — Visualize influence, conflict, and empathy between agents (vis-network / Force Atlas 2)
+- 🌱 **Seed input** — Auto-extract agents and topics from free text or existing documents
+- 🔄 **Switchable LLM** — ZAI GLM-5 (cloud), Ollama (local), OpenRouter — switch with one env var
+- 💾 **Agent persistence** — Save, reuse, and rate your favorite agents
 
 ---
 
-## 🚀 クイックスタート
+## 🚀 Quick Start
 
-### 必要なもの
+### Requirements
 
 - Python 3.12+
 - Node.js 20+
-- LLMバックエンド（以下のいずれか）:
-  - [Ollama](https://ollama.com)（ローカル、推奨: `qwen3.5:9b`）
-  - [ZAI](https://z.ai) APIキー
-  - [OpenRouter](https://openrouter.ai) APIキー
+- LLM backend (one of):
+  - [Ollama](https://ollama.com) (local, recommended: `qwen3.5:9b`)
+  - [ZAI](https://z.ai) API key
+  - [OpenRouter](https://openrouter.ai) API key
 
-### セットアップ
+### Setup
 
 ```bash
-# リポジトリをクローン
-git clone https://github.com/tak633b/41ch.git
-cd 41ch
+# Clone the repo
+git clone https://github.com/tak633b/41chan.git
+cd 41chan
 
-# バックエンド
+# Backend
 cd backend
 python3 -m venv venv
 venv/bin/pip install -r requirements.txt
 cp .env.example .env
-# .env を編集 — LLMバックエンドとAPIキーを設定
+# Edit .env — set your LLM backend and API keys
 
-# フロントエンド（別ターミナル）
+# Frontend (separate terminal)
 cd frontend
 npm install
 ```
 
-### 起動
+### Running
 
 ```bash
-# バックエンド（ターミナル1）
+# Backend (terminal 1)
 cd backend
 venv/bin/uvicorn main:app --reload --port 8000
 
-# フロントエンド（ターミナル2）
+# Frontend (terminal 2)
 cd frontend
 npm run dev
 ```
 
-👉 ブラウザで **http://localhost:3000** を開く
+👉 Open **http://localhost:3000** in your browser
 
 ---
 
-## ⚙️ 設定
+## ⚙️ Configuration
 
-設定はすべて `backend/.env` で管理します。全項目の説明は [`.env.example`](backend/.env.example) を参照。
+All settings are managed in `backend/.env`. See [`.env.example`](backend/.env.example) for all options.
 
-| 変数名 | 説明 | デフォルト |
-|--------|------|-----------|
-| `ORACLE_LLM_BACKEND` | LLMバックエンド (`ollama` / `zai` / `openrouter`) | `ollama` |
-| `ORACLE_ZAI_API_KEY` | ZAI APIキー | — |
-| `ORACLE_ZAI_MODEL` | ZAIのモデル名 | `glm-5` |
-| `ORACLE_OLLAMA_MODEL` | Ollamaのモデル名 | `qwen3.5:9b` |
-| `OPENROUTER_API_KEY` | OpenRouter APIキー | — |
-| `OPENROUTER_MODEL` | OpenRouterのモデル名 | `nvidia/nemotron-3-super-120b-a12b:free` |
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `ORACLE_LLM_BACKEND` | LLM backend (`ollama` / `zai` / `openrouter`) | `ollama` |
+| `ORACLE_ZAI_API_KEY` | ZAI API key | — |
+| `ORACLE_ZAI_MODEL` | ZAI model name | `glm-5` |
+| `ORACLE_OLLAMA_MODEL` | Ollama model name | `qwen3.5:9b` |
+| `OPENROUTER_API_KEY` | OpenRouter API key | — |
+| `OPENROUTER_MODEL` | OpenRouter model name | `nvidia/nemotron-3-super-120b-a12b:free` |
 
-### Ollama 推奨設定
+### Ollama Recommended Settings
 
 ```bash
-# 並列処理を有効化（デフォルト1だとシミュレーションが詰まる）
+# Enable parallel processing (default of 1 will bottleneck simulations)
 export OLLAMA_NUM_PARALLEL=4
 ollama serve
 ```
 
-| モデル | VRAM | 速度 | 品質 |
-|--------|------|------|------|
-| `qwen3.5:2b` | 1.5 GB | ⚡⚡⚡ | △（命令無視が多い） |
+| Model | VRAM | Speed | Quality |
+|-------|------|-------|---------|
+| `qwen3.5:2b` | 1.5 GB | ⚡⚡⚡ | △ (often ignores instructions) |
 | `qwen3.5:4b` | 2.5 GB | ⚡⚡ | ○ |
-| **`qwen3.5:9b`** | **5.5 GB** | **⚡** | **◎（推奨）** |
+| **`qwen3.5:9b`** | **5.5 GB** | **⚡** | **◎ (recommended)** |
 
-### ⚠️ ZAI (GLM-5) 使用時の注意
+### ⚠️ ZAI (GLM-5) Notes
 
-**1. エンドポイントは `coding/paas/v4` を使うこと**
+**1. Use the `coding/paas/v4` endpoint**
 
 ```
 https://api.z.ai/api/coding/paas/v4
 ```
 
-Coding Plan 専用エンドポイント。`paas/v4` では動作しない。
+This is the Coding Plan dedicated endpoint. The standard `paas/v4` endpoint will not work.
 
-**2. Thinking Mode を明示的に無効化すること**
+**2. Explicitly disable Thinking Mode**
 
-GLM-5 はデフォルトで Thinking が ON。無効化しないとレスポンスに `<think>…</think>` が混入してJSON解析が壊れる。
+GLM-5 has Thinking enabled by default. Without disabling it, `<think>…</think>` tags will contaminate responses and break JSON parsing.
 
 ```python
 extra_body={"thinking": {"type": "disabled"}}
 ```
 
-**3. 並列リクエストは禁止（直列化必須）**
+**3. Parallel requests are prohibited (must serialize)**
 
-Coding Plan はレート制限が厳しく、複数リクエストが同時に飛ぶと 429 が発生する。
-エラーメッセージが `"Insufficient balance"` と表示されるが **残高不足ではなく並列数超過**なので注意。
-→ `threading.Lock()` でグローバルロックをかけ直列化（MIN_INTERVAL=3秒を推奨）。
+Coding Plan has strict rate limits; multiple simultaneous requests will trigger 429 errors.
+The error message says `"Insufficient balance"` but this actually means **too many parallel requests**.
+→ Use `threading.Lock()` for a global lock to serialize (MIN_INTERVAL=3s recommended).
 
 ---
 
-## 🏗️ アーキテクチャ
+## 🏗️ Architecture
 
 ```mermaid
 graph TB
-    User[👤 ユーザー] -->|トピック入力| Frontend[Next.js 16<br/>5ch風UI]
+    User[👤 User] -->|Topic input| Frontend[Next.js 16<br/>4chan-style UI]
     Frontend -->|REST + SSE| Backend[FastAPI]
 
-    Backend --> Planner[パラメータ<br/>プランナー]
-    Backend --> Extractor[エンティティ<br/>抽出器]
-    Backend --> Generator[プロフィール<br/>ジェネレーター]
-    Backend --> Simulator[掲示板<br/>シミュレーター]
-    Backend --> Reporter[レポーター]
-    Backend --> Memory[メモリ<br/>マネージャー]
+    Backend --> Planner[Parameter<br/>Planner]
+    Backend --> Extractor[Entity<br/>Extractor]
+    Backend --> Generator[Profile<br/>Generator]
+    Backend --> Simulator[Board<br/>Simulator]
+    Backend --> Reporter[Reporter]
+    Backend --> Memory[Memory<br/>Manager]
 
-    Planner --> LLM[LLMクライアント]
+    Planner --> LLM[LLM Client]
     Extractor --> LLM
     Generator --> LLM
     Simulator --> LLM
     Reporter --> LLM
 
-    LLM -->|切替| ZAI[ZAI GLM-5]
-    LLM -->|切替| Ollama[Ollama]
-    LLM -->|切替| OpenRouter[OpenRouter]
+    LLM -->|switch| ZAI[ZAI GLM-5]
+    LLM -->|switch| Ollama[Ollama]
+    LLM -->|switch| OpenRouter[OpenRouter]
 
     Backend --> DB[(SQLite)]
     Memory --> ChromaDB[(ChromaDB)]
 ```
 
-### ディレクトリ構成
+### Directory Structure
 
 ```
-41ch/
-├── frontend/              # Next.js フロントエンド
-│   ├── app/               # App Routerページ
-│   │   ├── page.tsx       # ホーム（シミュレーション一覧）
-│   │   ├── new/           # 新規シミュレーション作成
-│   │   ├── sim/[id]/      # シミュレーション詳細
-│   │   │   ├── board/     # 板ビュー
-│   │   │   ├── thread/    # スレッドビュー
-│   │   │   ├── agents/    # エージェント一覧
-│   │   │   ├── report/    # レポートビュー
-│   │   │   └── ask/       # Q&Aスレッド
-│   │   └── agents/        # エージェント永続管理
-│   ├── components/        # Reactコンポーネント
-│   ├── styles/            # 5ch風CSS
-│   └── lib/               # APIクライアント
-├── backend/               # FastAPI バックエンド
-│   ├── main.py            # エントリポイント
-│   ├── api/               # APIルーター
-│   │   ├── simulation.py  # CRUD操作
-│   │   ├── board.py       # 板・スレッド
-│   │   ├── stream.py      # SSEストリーミング
-│   │   ├── report.py      # レポート
-│   │   ├── ask.py         # Q&A機能
-│   │   ├── agent_chat.py  # エージェントチャット
-│   │   ├── graph.py       # 関係グラフAPI
-│   │   └── seed.py        # シード入力API
-│   ├── core/              # コアモジュール
-│   │   ├── llm_client.py  # 統合LLMクライアント（ZAI 2スロット方式）
+41chan/
+├── frontend/              # Next.js frontend
+│   ├── app/               # App Router pages
+│   │   ├── page.tsx       # Home (simulation list)
+│   │   ├── new/           # New simulation creation
+│   │   ├── sim/[id]/      # Simulation detail
+│   │   │   ├── board/     # Board view
+│   │   │   ├── thread/    # Thread view
+│   │   │   ├── agents/    # Agent list
+│   │   │   ├── report/    # Report view
+│   │   │   └── ask/       # Q&A thread
+│   │   └── agents/        # Persistent agent management
+│   ├── components/        # React components
+│   ├── styles/            # 4chan-style CSS
+│   └── lib/               # API client
+├── backend/               # FastAPI backend
+│   ├── main.py            # Entry point
+│   ├── api/               # API routers
+│   │   ├── simulation.py  # CRUD operations
+│   │   ├── board.py       # Boards & threads
+│   │   ├── stream.py      # SSE streaming
+│   │   ├── report.py      # Report
+│   │   ├── ask.py         # Q&A
+│   │   ├── agent_chat.py  # Agent chat
+│   │   ├── graph.py       # Relationship graph API
+│   │   └── seed.py        # Seed input API
+│   ├── core/              # Core modules
+│   │   ├── llm_client.py  # Unified LLM client (ZAI 2-slot method)
 │   │   ├── entity_extractor.py
 │   │   ├── profile_generator.py
 │   │   ├── board_simulator.py
 │   │   ├── reporter.py
 │   │   ├── parameter_planner.py
 │   │   ├── memory_manager.py
-│   │   ├── relationship_tracker.py  # GraphRAG: エージェント関係追跡
-│   │   └── seed_extractor.py        # シードテキスト→パラメータ抽出
-│   ├── services/          # ビジネスロジック
-│   ├── models/            # Pydanticスキーマ
-│   ├── agents/            # ストックエージェントデータ (JSON)
-│   └── db/                # SQLiteデータベース
-└── docs/                  # ドキュメント
+│   │   ├── relationship_tracker.py  # GraphRAG: agent relationship tracking
+│   │   └── seed_extractor.py        # Seed text → parameter extraction
+│   ├── services/          # Business logic
+│   ├── models/            # Pydantic schemas
+│   ├── agents/            # Stock agent data (JSON)
+│   └── db/                # SQLite database
+└── docs/                  # Documentation
 ```
 
 ---
 
 ## 📡 API
 
-詳細は [docs/api.md](docs/api.md) を参照。
+See [docs/api.md](docs/api.md) for full details.
 
-| Method | Path | 説明 |
-|--------|------|------|
-| `POST` | `/api/simulation/create` | シミュレーション作成 |
-| `GET` | `/api/simulation/{id}/status` | 進行状況取得 |
-| `GET` | `/api/simulations` | 一覧取得 |
-| `DELETE` | `/api/simulation/{id}` | 削除 |
-| `GET` | `/api/simulation/{id}/boards` | 板一覧 |
-| `GET` | `/api/simulation/{id}/board/{boardId}/threads` | スレッド一覧 |
-| `GET` | `/api/simulation/{id}/thread/{threadId}` | スレッド詳細 |
-| `GET` | `/api/simulation/{id}/stream` | SSEストリーム |
-| `GET` | `/api/simulation/{id}/agents` | エージェント一覧 |
-| `GET` | `/api/simulation/{id}/report` | レポート取得 |
-| `POST` | `/api/simulation/{id}/ask` | エージェントへ質問（SSE） |
-| `GET` | `/api/simulation/{id}/ask/history` | 質問履歴 |
-| `GET` | `/api/simulation/{id}/graph` | 関係グラフ取得 |
-| `POST` | `/api/simulation/{id}/agent/{agentId}/chat` | エージェントとチャット |
-| `POST` | `/api/seed/extract` | シードテキストからパラメータ抽出 |
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/simulation/create` | Create simulation |
+| `GET` | `/api/simulation/{id}/status` | Get progress |
+| `GET` | `/api/simulations` | List all |
+| `DELETE` | `/api/simulation/{id}` | Delete |
+| `GET` | `/api/simulation/{id}/boards` | List boards |
+| `GET` | `/api/simulation/{id}/board/{boardId}/threads` | List threads |
+| `GET` | `/api/simulation/{id}/thread/{threadId}` | Thread detail |
+| `GET` | `/api/simulation/{id}/stream` | SSE stream |
+| `GET` | `/api/simulation/{id}/agents` | List agents |
+| `GET` | `/api/simulation/{id}/report` | Get report |
+| `POST` | `/api/simulation/{id}/ask` | Ask an agent (SSE) |
+| `GET` | `/api/simulation/{id}/ask/history` | Question history |
+| `GET` | `/api/simulation/{id}/graph` | Relationship graph |
+| `POST` | `/api/simulation/{id}/agent/{agentId}/chat` | Chat with agent |
+| `POST` | `/api/seed/extract` | Extract parameters from seed text |
 
 ---
 
-## 📋 変更履歴
+## 📋 Changelog
 
 ### v0.4.0 (2026-03-18)
 
-**パフォーマンス改善**
-- バッチ投稿生成復活（BATCH_SIZE=4）でフルスケール 45分 → 10〜15分に短縮
-- ZAI 2スロット方式（実効並列間隔 1.5秒）
-- 類似度チェック軽量化（threshold 0.35→0.45、max_retry 3→1）
-- レポート生成最適化（cooldown=0、代表投稿50件に圧縮）
-- テンプレートベーススレ立て（LLMコール削減）
+**Performance improvements**
+- Batch post generation restored (BATCH_SIZE=4): full scale 45min → 10–15min
+- ZAI 2-slot method (effective parallel interval 1.5s)
+- Similarity check optimized (threshold 0.35→0.45, max_retry 3→1)
+- Report generation optimized (cooldown=0, compressed to 50 representative posts)
+- Template-based thread creation (reduces LLM calls)
 
-**新機能: GraphRAG**
-- エージェント間の関係グラフをリアルタイム追跡（`relationship_tracker.py`）
-- vis-network（Force Atlas 2）でグラフ可視化
-- スレ主を「最も影響力が高い」ランキングから自動除外
-- グラフ安定後に物理シミュレーション自動停止
+**New: GraphRAG**
+- Real-time tracking of relationship graph between agents (`relationship_tracker.py`)
+- vis-network (Force Atlas 2) graph visualization
+- Automatically excludes OP from "most influential" ranking
+- Physics simulation auto-stops after graph stabilizes
 
-**新機能: シード入力**
-- フリーテキスト・ドキュメントからエージェント・議題・板構成を自動抽出
+**New: Seed input**
+- Auto-extract agents, topics, and board structure from free text or documents
 
-**新機能: エージェントチャット**
-- シミュレーション進行中にエージェントへ直接質問・対話
+**New: Agent chat**
+- Directly question and converse with agents during simulation
 
-**ZAI (GLM-5) 安定化**
-- グローバル2スロット排他ロックで429を根本解消
-- リトライ上限 3→6回、待機上限 60→120秒
+**ZAI (GLM-5) stability**
+- Global 2-slot exclusive lock to fundamentally fix 429 errors
+- Retry limit 3→6, wait cap 60→120 seconds
 
 ### v0.3.0 (2026-03-17)
 
-- **OSS公開**: APIキーをgit履歴から完全削除（git-filter-repo）
-- ドキュメント整備: README英語版・CONTRIBUTING.md・アーキテクチャ・APIドキュメント
-- react-markdown + remark-gfmで`[>>N@板名]`引用リンク正常表示
+- **OSS release**: API keys completely removed from git history (git-filter-repo)
+- Documentation: English README, CONTRIBUTING.md, architecture, API docs
+- react-markdown + remark-gfm for proper `[>>N@board]` citation link rendering
 
 ### v0.2.0 (2026-03-16)
 
-- ZAI GLM-5バックエンド正式対応
-- 真のリアルタイム投稿生成（LLM→1投稿→DB→emit）
-- 起動時中断シミュレーション自動再開
-- 30体ストックエージェント（構造化14セクションペルソナ）
+- ZAI GLM-5 backend officially supported
+- True real-time post generation (LLM → 1 post → DB → emit)
+- Auto-resume interrupted simulations on startup
+- 30 stock agents (structured 14-section personas)
 
 ---
 
-## 🤝 コントリビュート
+## 🤝 Contributing
 
-PRやIssueは歓迎です！詳細は [CONTRIBUTING.md](CONTRIBUTING.md) を参照。
+PRs and Issues welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
 ```bash
-# フィーチャーブランチを作成
+# Create a feature branch
 git checkout -b feature/your-feature
 
-# コードスタイル
+# Code style
 # Python: ruff / black
 # TypeScript: prettier + eslint
 ```
 
 ---
 
-## 📄 ライセンス
+## 📄 License
 
 [MIT License](LICENSE) © 2025 Hasumura Takashi
 
 ---
 
-## 🙏 謝辞
+## 🙏 Acknowledgements
 
-- [FastAPI](https://fastapi.tiangolo.com/) — 高性能Pythonウェブフレームワーク
-- [Next.js](https://nextjs.org/) — Reactフレームワーク
-- [Ollama](https://ollama.com/) — ローカルLLMランタイム
-- [ZAI](https://z.ai/) — GLMシリーズLLM
-- 2ちゃんねる文化へのリスペクトを込めて 🎌
+- [FastAPI](https://fastapi.tiangolo.com/) — High-performance Python web framework
+- [Next.js](https://nextjs.org/) — React framework
+- [Ollama](https://ollama.com/) — Local LLM runtime
+- [ZAI](https://z.ai/) — GLM series LLM

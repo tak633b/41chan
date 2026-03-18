@@ -1,6 +1,6 @@
 """
-板自動生成サービス
-LLMにエンティティ・テーマ・論点を渡して、適切な板構成を生成する。
+Board auto-generation service
+Passes entities, theme, and key issues to LLM to generate appropriate board structure.
 """
 
 import json
@@ -8,11 +8,13 @@ from typing import Any, Dict, List
 
 from core.llm_client import OracleLLMClient
 
-BOARD_GEN_SYSTEM = "JSONのみ返せ。"
+BOARD_GEN_SYSTEM = "Return JSON only. All text must be in English."
 
-BOARD_GEN_PROMPT = """テーマ:{theme}
+BOARD_GEN_PROMPT = """Theme:{theme}
 JSON:
-{{"boards":[{{"name":"板","emoji":"📚","description":"説明","initial_threads":["【】スレ"]}}]}}"""
+{{"boards":[{{"name":"board name","emoji":"📚","description":"description","initial_threads":["[Tag] Thread title"]}}]}}
+All board names, descriptions, and thread titles must be in English.
+Use 4chan-style thread title tags like [Discussion], [Question], [Hot Take], [Serious], [Greentext], [News], [Opinion]."""
 
 
 def generate_boards(
@@ -23,12 +25,12 @@ def generate_boards(
     scale: str = "full",
 ) -> List[Dict[str, Any]]:
     """
-    テーマから板構成を自動生成する。
+    Auto-generate board structure from theme.
 
     Returns:
         [{"name": str, "emoji": str, "description": str, "initial_threads": [str, ...]}, ...]
     """
-    # エンティティを要約（最小限）
+    # Summarize entities (minimal)
     entity_names = ", ".join(e.get('name', '?') for e in entities[:3])
     issues_text = ", ".join(key_issues[:2])
 
@@ -45,43 +47,46 @@ def generate_boards(
     result = llm.chat_json(messages, temperature=0.6)
     boards = result.get("boards", [])
 
-    # バリデーション
+    # Validation
     validated = []
-    has_zatsudan = False
+    has_random = False
     for b in boards:
         name = b.get("name", "")
         if not name:
             continue
-        if "雑談" in name or "なんでも" in name:
-            has_zatsudan = True
+        if "random" in name.lower() or "general" in name.lower() or "chat" in name.lower():
+            has_random = True
         validated.append(
             {
                 "name": name,
                 "emoji": b.get("emoji", "💬"),
                 "description": b.get("description", ""),
-                "initial_threads": b.get("initial_threads", [f"【{name}】総合スレ"]),
+                "initial_threads": b.get("initial_threads", [f"[{name}] General thread"]),
             }
         )
 
-    # 雑談板がなければ追加
-    if not has_zatsudan:
+    # Add random/chat board if missing
+    if not has_random:
         validated.append(
             {
-                "name": "雑談・なんでも板",
+                "name": "Random",
                 "emoji": "💬",
-                "description": "テーマ周辺の雑談",
-                "initial_threads": ["【雑談】何でも語るスレ"],
+                "description": "Off-topic discussion related to the theme",
+                "initial_threads": ["[Random] Anything goes"],
             }
         )
 
-    # 3〜6板に収める
-    result_boards = validated[:6] if len(validated) > 6 else validated
-
-    # miniスケール: 板1つ・スレ1つに強制
+    # mini scale: force 1 board, 1 thread
     if scale == "mini":
-        if result_boards:
-            first_board = result_boards[0]
-            first_board["initial_threads"] = first_board["initial_threads"][:1] if first_board.get("initial_threads") else [f"【{first_board['name']}】スレ"]
+        if validated:
+            first_board = validated[0]
+            first_board["initial_threads"] = first_board["initial_threads"][:1] if first_board.get("initial_threads") else [f"[{first_board['name']}] General thread"]
             return [first_board]
-        return result_boards
+        return validated
+
+    # full scale: limit to 2 boards, 2 threads/board
+    result_boards = validated[:2]
+    for b in result_boards:
+        b["initial_threads"] = b["initial_threads"][:2] if b.get("initial_threads") else [f"[{b['name']}] General thread"]
+
     return result_boards

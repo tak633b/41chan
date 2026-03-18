@@ -1,24 +1,26 @@
 """
-Oracle パラメータプランナー
-プロンプト/シード内容をLLMで分析し、シミュレーションの最適なパラメータを1回のLLM呼び出しで決定する。
+41chan Parameter Planner
+Analyzes prompt/seed content with LLM and determines optimal simulation parameters in a single LLM call.
 """
 
 from typing import Any, Dict, List, Optional
 from .llm_client import OracleLLMClient
 
-PLANNER_SYSTEM = "5ch掲示板シミュレーションのプランナー。JSONのみ返せ。説明不要。"
+PLANNER_SYSTEM = "You are a planner for an English imageboard simulation. Return JSON only. No explanations."
 
-PLANNER_USER_TEMPLATE = """テーマ: {prompt}
-追加情報: {seed_text}
+PLANNER_USER_TEMPLATE = """Theme: {prompt}
+Additional info: {seed_text}
 
-JSONで返せ:
-{{"agent_count":8,"agent_roles":[{{"role":"教授","tone":"authority","stance":"推進派","count":2}}],"boards":[{{"name":"議論板","threads":["【議論】スレタイ","【質問】スレタイ"]}}],"rounds_per_thread":3,"total_estimated_posts":150,"reasoning":"理由"}}
+Return JSON:
+{{"agent_count":8,"agent_roles":[{{"role":"tech expert","tone":"authority","stance":"pro","count":2}}],"boards":[{{"name":"Technology","threads":["[Discussion] Thread title","[Question] Thread title"]}}],"rounds_per_thread":3,"total_estimated_posts":150,"reasoning":"reason"}}
 
-条件:
+Constraints:
 - agent_count: 6-15
 - tone: authority/worker/youth/outsider/lurker
-- boards: 2-5板、スレ2-4本/板、5ch風スレタイ（【悲報】【朗報】等）
-- rounds_per_thread: 2-8"""
+- boards: 2-5 boards, 2-4 threads/board, 4chan-style thread titles ([Serious], [Greentext], [Hot Take], [Question], etc.)
+- rounds_per_thread: 2-8
+- All board names and thread titles must be in English
+- Generate boards and threads relevant to the theme"""
 
 VALID_TONES = {"authority", "worker", "youth", "outsider", "lurker"}
 
@@ -29,9 +31,9 @@ def plan_parameters(
     llm: OracleLLMClient,
 ) -> Dict[str, Any]:
     """
-    プロンプト/シードを分析してシミュレーションパラメータを決定する。
+    Analyze prompt/seed and determine simulation parameters.
 
-    LLM呼び出しは1回のみ（追加コスト最小限）。
+    Single LLM call only (minimal additional cost).
 
     Returns:
         {
@@ -49,30 +51,30 @@ def plan_parameters(
             "role": "user",
             "content": PLANNER_USER_TEMPLATE.format(
                 prompt=prompt,
-                seed_text=seed_text or "（なし）",
+                seed_text=seed_text or "(none)",
             ),
         },
     ]
 
-    print("[ParameterPlanner] パラメータ決定中...", flush=True)
+    print("[ParameterPlanner] Determining parameters...", flush=True)
     result = llm.chat_json(messages, temperature=0.4)
 
-    # バリデーション・クランプ
+    # Validation and clamping
     result = _validate_and_clamp(result)
 
     print(
-        f"[ParameterPlanner] 決定: エージェント{result['agent_count']}人, "
-        f"{len(result['boards'])}板, "
-        f"{result['rounds_per_thread']}ラウンド/スレッド",
+        f"[ParameterPlanner] Decided: {result['agent_count']} agents, "
+        f"{len(result['boards'])} boards, "
+        f"{result['rounds_per_thread']} rounds/thread",
         flush=True,
     )
-    print(f"[ParameterPlanner] 理由: {result.get('reasoning', '')}", flush=True)
+    print(f"[ParameterPlanner] Reasoning: {result.get('reasoning', '')}", flush=True)
 
     return result
 
 
 def _validate_and_clamp(result: Dict[str, Any]) -> Dict[str, Any]:
-    """LLM応答のバリデーションとクランプ。範囲外は安全な値に収める。"""
+    """Validate and clamp LLM response. Out-of-range values are set to safe defaults."""
     # --- agent_count: 6-15 ---
     agent_count = result.get("agent_count", 8)
     try:
@@ -82,14 +84,14 @@ def _validate_and_clamp(result: Dict[str, Any]) -> Dict[str, Any]:
     agent_count = max(6, min(15, agent_count))
     result["agent_count"] = agent_count
 
-    # --- agent_roles の検証 ---
+    # --- agent_roles validation ---
     agent_roles: List[Dict[str, Any]] = result.get("agent_roles", [])
     if not isinstance(agent_roles, list) or len(agent_roles) == 0:
         agent_roles = [
-            {"role": "参加者", "tone": "worker", "stance": "中立", "count": agent_count}
+            {"role": "anon", "tone": "worker", "stance": "neutral", "count": agent_count}
         ]
 
-    # toneのバリデーションと count の整数化
+    # Validate tone and convert count to int
     for r in agent_roles:
         if r.get("tone") not in VALID_TONES:
             r["tone"] = "worker"
@@ -98,15 +100,15 @@ def _validate_and_clamp(result: Dict[str, Any]) -> Dict[str, Any]:
         except (ValueError, TypeError):
             r["count"] = 1
 
-    # agent_roles の合計を agent_count に一致させる
+    # Align agent_roles total with agent_count
     total = sum(r["count"] for r in agent_roles)
     if total != agent_count:
         diff = agent_count - total
         if diff > 0:
-            # 不足分を最後のロールに加算
+            # Add deficit to last role
             agent_roles[-1]["count"] += diff
         else:
-            # 超過分を count が大きいロールから削る
+            # Remove excess from largest roles
             remaining = abs(diff)
             for r in sorted(agent_roles, key=lambda x: -x["count"]):
                 cut = min(r["count"] - 1, remaining)
@@ -115,31 +117,31 @@ def _validate_and_clamp(result: Dict[str, Any]) -> Dict[str, Any]:
                 if remaining <= 0:
                     break
 
-    # count=0 のロールを除去
+    # Remove roles with count=0
     agent_roles = [r for r in agent_roles if r.get("count", 0) > 0]
     result["agent_roles"] = agent_roles
 
-    # --- boards: 2-5板 ---
+    # --- boards: 2-5 boards ---
     boards: List[Dict[str, Any]] = result.get("boards", [])
     if not isinstance(boards, list) or len(boards) == 0:
         boards = [
-            {"name": "総合議論板", "threads": ["【議論】総合スレ", "【質問】なんでも聞くスレ"]},
-            {"name": "雑談板", "threads": ["【雑談】何でも語るスレ"]},
+            {"name": "General Discussion", "threads": ["[Discussion] General thread", "[Question] Ask anything"]},
+            {"name": "Random", "threads": ["[Random] Anything goes"]},
         ]
 
-    # 板数クランプ (2-5)
+    # Clamp board count (2-5)
     boards = boards[:5]
     if len(boards) < 2:
-        boards.append({"name": "雑談板", "threads": ["【雑談】何でも語るスレ"]})
+        boards.append({"name": "Random", "threads": ["[Random] Anything goes"]})
 
-    # スレッド数クランプ (2-4本/板)
+    # Clamp thread count per board (2-4)
     for b in boards:
         threads = b.get("threads", [])
         if not isinstance(threads, list) or len(threads) == 0:
-            threads = [f"【{b.get('name', '板')}】総合スレ"]
+            threads = [f"[{b.get('name', 'board')}] General thread"]
         threads = threads[:4]
         if len(threads) < 2:
-            threads.append(f"【{b.get('name', '板')}】雑談スレ")
+            threads.append(f"[{b.get('name', 'board')}] Random thread")
         b["threads"] = threads
 
     result["boards"] = boards
@@ -169,31 +171,33 @@ def _validate_and_clamp(result: Dict[str, Any]) -> Dict[str, Any]:
 
 def convert_planner_boards(planner_boards: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
-    パラメータプランナーの board 形式を simulation_runner / board_generator が
-    期待する形式に変換する。
+    Convert parameter planner board format to the format expected by
+    simulation_runner / board_generator.
 
     Input:  [{"name": str, "threads": [str, ...]}, ...]
     Output: [{"name": str, "emoji": str, "description": str, "initial_threads": [str, ...]}, ...]
     """
     _EMOJI_MAP = {
-        "雑談": "💬", "政策": "📋", "議論": "🗣️", "学生": "🎓", "教員": "📚",
-        "経営": "💼", "技術": "🔧", "行政": "🏛️", "市民": "👥", "研究": "🔬",
-        "情報": "📡", "経済": "💰", "法律": "⚖️", "医療": "🏥", "環境": "🌿",
+        "random": "💬", "politics": "📋", "discussion": "🗣️", "tech": "🔧",
+        "technology": "🔧", "science": "🔬", "business": "💼", "news": "📰",
+        "sports": "⚽", "anime": "🎌", "gaming": "🎮", "music": "🎵",
+        "food": "🍔", "health": "🏥", "finance": "💰", "law": "⚖️",
+        "environment": "🌿", "history": "📚", "general": "💬",
     }
 
     result = []
     for b in planner_boards:
-        name = b.get("name", "板")
-        # 名前から絵文字を推定
+        name = b.get("name", "board")
+        # Infer emoji from name
         emoji = "💬"
         for kw, em in _EMOJI_MAP.items():
-            if kw in name:
+            if kw.lower() in name.lower():
                 emoji = em
                 break
         result.append({
             "name": name,
             "emoji": emoji,
-            "description": f"{name}での議論・情報交換",
-            "initial_threads": b.get("threads", [f"【{name}】総合スレ"]),
+            "description": f"Discussion and debate on {name}",
+            "initial_threads": b.get("threads", [f"[{name}] General thread"]),
         })
     return result

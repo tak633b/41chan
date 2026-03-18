@@ -11,6 +11,8 @@ import json
 import sqlite3
 import uuid
 import os
+import hashlib
+import threading
 from contextlib import contextmanager
 from datetime import datetime
 from typing import List, Dict, Any, Optional
@@ -50,6 +52,24 @@ CREATE INDEX IF NOT EXISTS idx_episodes_project ON episodes(project_id);
 
 class MemoryManager:
     """エージェント記憶管理システム"""
+
+    # 長期記憶用 ChromaDB PersistentClient（プロセス内で1インスタンス共有）
+    _longterm_client = None
+    _longterm_lock = threading.Lock()
+    _LONGTERM_DB_DIR = "/Users/takashihasumura/oracle-channel/backend/db/chroma_longterm"
+    _AGENT_MEMORIES_DIR = "/Users/takashihasumura/oracle-channel/backend/data/agent_memories"
+
+    @classmethod
+    def _get_longterm_client(cls):
+        """長期記憶用 ChromaDB PersistentClient を取得（シングルトン）"""
+        if cls._longterm_client is None:
+            with cls._longterm_lock:
+                if cls._longterm_client is None:
+                    if CHROMA_AVAILABLE:
+                        os.makedirs(cls._LONGTERM_DB_DIR, exist_ok=True)
+                        cls._longterm_client = chromadb.PersistentClient(path=cls._LONGTERM_DB_DIR)
+                        print(f"[MemoryManager] 長期記憶ChromaDB初期化完了: {cls._LONGTERM_DB_DIR}")
+        return cls._longterm_client
 
     def __init__(self, db_dir: str, project_id: str, llm: Optional[OracleLLMClient] = None):
         """
@@ -363,3 +383,156 @@ class MemoryManager:
             }
             for r in rows
         ]
+
+    # ------------------------------------------------------------------
+    # 長期記憶（シミュレーション跨ぎ）
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _longterm_collection_name(agent_id: str) -> str:
+        """エージェント名から長期記憶コレクション名を生成（日本語対応）"""
+        h = hashlib.md5(agent_id.encode()).hexdigest()[:12]
+        return f"agent_longterm_{h}"
+
+    def _get_longterm_collection(self, agent_id: str):
+        """エージェント用の長期記憶コレクションを取得/作成"""
+        client = self._get_longterm_client()
+        if client is None:
+            return None
+        coll_name = self._longterm_collection_name(agent_id)
+        return client.get_or_create_collection(name=coll_name)
+
+    def store_longterm(
+        self,
+        agent_id: str,
+        content: str,
+        importance: float,
+        sim_id: str,
+        theme: str,
+    ) -> None:
+        """長期記憶を ChromaDB + .md ファイルに保存"""
+        # 1. ChromaDB に保存
+        collection = self._get_longterm_collection(agent_id)
+        if collection is not None:
+            doc_id = str(uuid.uuid4())
+            try:
+                collection.add(
+                    ids=[doc_id],
+                    documents=[content],
+                    metadatas=[{
+                        "agent_id": agent_id,
+                        "sim_id": sim_id,
+                        "theme": theme,
+                        "importance": importance,
+                        "created_at": datetime.utcnow().isoformat(),
+                    }],
+                )
+            except Exception as e:
+                print(f"[MemoryManager] 長期記憶ChromaDB保存失敗 {agent_id}: {e}")
+
+        # 2. .md ファイルに追記
+        os.makedirs(self._AGENT_MEMORIES_DIR, exist_ok=True)
+        md_path = os.path.join(self._AGENT_MEMORIES_DIR, f"{agent_id}.md")
+        today = datetime.now().strftime("%Y-%m-%d")
+
+        try:
+            if not os.path.exists(md_path):
+                with open(md_path, "w", encoding="utf-8") as f:
+                    f.write(f"# {agent_id} の記憶ログ\n\n")
+
+            with open(md_path, "a", encoding="utf-8") as f:
+                f.write(f"## {today} | テーマ: {theme} | シム: {sim_id[:8]}\n")
+                f.write(f"{content}\n\n---\n\n")
+        except Exception as e:
+            print(f"[MemoryManager] 長期記憶.md保存失敗 {agent_id}: {e}")
+
+        print(f"[MemoryManager] 長期記憶保存完了: {agent_id} (theme={theme[:30]})")
+
+    def recall_longterm(
+        self,
+        agent_id: str,
+        context: str,
+        top_k: int = 3,
+    ) -> List[Dict[str, Any]]:
+        """長期記憶から意味検索（全シミュレーション横断）"""
+        collection = self._get_longterm_collection(agent_id)
+        if collection is None:
+            return []
+
+        try:
+            # コレクションが空の場合はスキップ
+            if collection.count() == 0:
+                return []
+
+            results = collection.query(
+                query_texts=[context],
+                n_results=min(top_k, collection.count()),
+            )
+
+            memories = []
+            if results["ids"] and results["ids"][0]:
+                for i, doc_id in enumerate(results["ids"][0]):
+                    doc = results["documents"][0][i] if results["documents"] else ""
+                    dist = results["distances"][0][i] if results["distances"] else 1.0
+                    meta = results["metadatas"][0][i] if results["metadatas"] else {}
+                    memories.append({
+                        "content": doc,
+                        "score": 1.0 - dist,
+                        "theme": meta.get("theme", ""),
+                        "sim_id": meta.get("sim_id", ""),
+                    })
+            return memories
+        except Exception as e:
+            print(f"[MemoryManager] 長期記憶recall失敗 {agent_id}: {e}")
+            return []
+
+    def distill_experience(
+        self,
+        agent_id: str,
+        sim_id: str,
+        theme: str,
+        all_posts: List[str],
+    ) -> None:
+        """シミュ終了後にエージェントの体験をLLMで蒸留し、長期記憶に保存"""
+        # 投稿一覧を番号付きで整形（各100字まで）
+        posts_text = "\n".join(
+            f"{i+1}. {post[:100]}" for i, post in enumerate(all_posts)
+        )
+
+        if self.llm is not None:
+            try:
+                messages = [
+                    {
+                        "role": "system",
+                        "content": "あなたはエージェントの記憶蒸留専門家です。",
+                    },
+                    {
+                        "role": "user",
+                        "content": f"""あなたは{agent_id}です。今日の議論「{theme}」で以下の投稿をしました。
+
+{posts_text}
+
+この議論を振り返り、以下を含めて300字以内で記録してください：
+①印象に残った議論の流れや発言
+②自分の立場・感情の変化
+③次回以降に活かしたい気づき
+
+一人称で、内省的に書いてください。""",
+                    },
+                ]
+                distilled = self.llm.chat(messages, temperature=0.3)
+            except Exception as e:
+                print(f"[MemoryManager] LLM蒸留失敗 {agent_id}: {e} — フォールバック使用")
+                distilled = " ".join(all_posts[:2])[:300]
+        else:
+            # LLMなし: フォールバック
+            distilled = " ".join(all_posts[:2])[:300]
+
+        # 長期記憶に保存
+        self.store_longterm(
+            agent_id=agent_id,
+            content=distilled,
+            importance=0.8,
+            sim_id=sim_id,
+            theme=theme,
+        )

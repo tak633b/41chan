@@ -1,6 +1,7 @@
 """
-Oracle プロフィール生成器
-MiroFish準拠の2000字ペルソナを生成。口調5タイプ、個人vs組織の区別あり。
+41chan Profile Generator
+Generates 2000-char personas in the MiroFish style.
+5 tone types, distinguishes individual vs organization agents.
 """
 
 import json
@@ -17,31 +18,31 @@ MBTI_TYPES = [
     "ISTP", "ISFP", "ESTP", "ESFP",
 ]
 
-# ─── 日本人名リスト ───────────────────────────────────────────────
+# ─── English name lists ───────────────────────────────────────────────
 LAST_NAMES = [
-    "田中", "佐藤", "鈴木", "高橋", "伊藤", "渡辺", "山本", "中村", "小林", "加藤",
-    "吉田", "山口", "松本", "井上", "林", "石川", "前田", "藤田", "岡田", "後藤",
-    "森", "長谷川", "近藤", "坂本", "遠藤", "青木", "池田", "橋本", "山田", "石田",
-    "西村", "三浦", "岡本", "藤原", "上田", "中島", "原田", "安藤", "河野", "小川",
-    "内田", "菊池", "野口", "久保", "新井", "木下", "杉山", "横山", "荒木", "宮崎",
-    "大塚", "星野", "今井", "武田", "千葉", "堀", "関", "水野", "丸山", "矢野",
+    "Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia", "Miller", "Davis", "Wilson", "Taylor",
+    "Anderson", "Thomas", "Jackson", "White", "Harris", "Martin", "Thompson", "Young", "Allen", "King",
+    "Wright", "Scott", "Torres", "Green", "Adams", "Nelson", "Baker", "Hill", "Rivera", "Campbell",
+    "Mitchell", "Carter", "Roberts", "Gomez", "Phillips", "Evans", "Turner", "Diaz", "Parker", "Collins",
+    "Edwards", "Stewart", "Flores", "Morris", "Nguyen", "Murphy", "Rivera", "Cook", "Rogers", "Morgan",
+    "Peterson", "Cooper", "Reed", "Bailey", "Bell", "Gonzalez", "Ward", "Cox", "Richardson", "Howard",
 ]
 FIRST_NAMES_M = [
-    "太郎", "一郎", "健太", "拓海", "翔太", "和彦", "正之", "誠", "大輔", "浩二",
-    "隆", "修", "博", "剛", "亮", "勇気", "直人", "哲也", "雄一", "慎一",
-    "俊介", "達也", "光司", "康平", "祐介", "賢二", "徹", "悠介", "武史", "敬介",
-    "蓮", "湊", "樹", "颯真", "律", "陸", "朝陽", "結翔", "悠真", "凛太郎",
-    "龍之介", "壮馬", "航", "匠", "奏", "暖", "新", "蒼", "碧", "陽翔",
+    "James", "John", "Robert", "Michael", "William", "David", "Richard", "Joseph", "Thomas", "Charles",
+    "Christopher", "Daniel", "Matthew", "Anthony", "Donald", "Mark", "Paul", "Steven", "Andrew", "Kenneth",
+    "Joshua", "Kevin", "Brian", "George", "Timothy", "Ronald", "Edward", "Jason", "Jeffrey", "Ryan",
+    "Jacob", "Gary", "Nicholas", "Eric", "Jonathan", "Stephen", "Larry", "Justin", "Scott", "Brandon",
+    "Benjamin", "Samuel", "Raymond", "Gregory", "Patrick", "Frank", "Alexander", "Jack", "Dennis", "Jerry",
 ]
 FIRST_NAMES_F = [
-    "花子", "美咲", "陽子", "恵子", "裕子", "真由美", "あゆみ", "さくら", "千尋", "由美",
-    "智子", "麻衣", "友香", "理恵", "綾", "奈々", "彩", "美穂", "沙織", "菜々子",
-    "里奈", "佳奈", "有紀", "明日香", "優子", "純子", "真希", "亜矢", "瑞穂", "詩織",
-    "凛", "紬", "陽葵", "芽依", "澪", "結菜", "杏", "莉子", "琴音", "日和",
-    "楓", "柚希", "心春", "乃愛", "咲良", "桜", "凪", "葵", "栞", "茜",
+    "Mary", "Patricia", "Jennifer", "Linda", "Barbara", "Elizabeth", "Susan", "Jessica", "Sarah", "Karen",
+    "Lisa", "Nancy", "Betty", "Margaret", "Sandra", "Ashley", "Dorothy", "Kimberly", "Emily", "Donna",
+    "Michelle", "Carol", "Amanda", "Melissa", "Deborah", "Stephanie", "Rebecca", "Sharon", "Laura", "Cynthia",
+    "Kathleen", "Amy", "Angela", "Shirley", "Anna", "Brenda", "Pamela", "Emma", "Nicole", "Helen",
+    "Samantha", "Katherine", "Christine", "Debra", "Rachel", "Carolyn", "Janet", "Catherine", "Maria", "Heather",
 ]
 
-# ─── 年齢レンジ（口調タイプ別）─────────────────────────────────────
+# ─── Age ranges by tone type ─────────────────────────────────────────
 AGE_RANGES = {
     "authority": (45, 65),
     "worker":    (30, 50),
@@ -50,84 +51,84 @@ AGE_RANGES = {
     "lurker":    (20, 70),
 }
 
-# ─── MBTI 役割×立場 推奨マッピング ────────────────────────────────
+# ─── MBTI role × stance recommended mapping ────────────────────────────
 MBTI_ROLE_MAP = {
     "authority": {
-        "推進派": ["ENTJ", "ESTJ", "ENFJ"],
-        "反対派": ["ISTJ", "INTJ", "INFJ"],
-        "中立":   ["ESTJ", "ISFJ", "ENFJ"],
-        "懐疑":   ["INTJ", "INTP", "ISTJ"],
+        "pro":       ["ENTJ", "ESTJ", "ENFJ"],
+        "con":       ["ISTJ", "INTJ", "INFJ"],
+        "neutral":   ["ESTJ", "ISFJ", "ENFJ"],
+        "skeptical": ["INTJ", "INTP", "ISTJ"],
     },
     "worker": {
-        "推進派": ["ESTP", "ESFJ", "ENFP"],
-        "反対派": ["ISFJ", "ISTJ", "ISTP"],
-        "中立":   ["ISFP", "ESFP", "ISFJ"],
-        "懐疑":   ["ISTP", "INTP", "INFP"],
+        "pro":       ["ESTP", "ESFJ", "ENFP"],
+        "con":       ["ISFJ", "ISTJ", "ISTP"],
+        "neutral":   ["ISFP", "ESFP", "ISFJ"],
+        "skeptical": ["ISTP", "INTP", "INFP"],
     },
     "youth": {
-        "推進派": ["ENFP", "ENTP", "ESFP"],
-        "反対派": ["INFP", "ISFP", "INTP"],
-        "中立":   ["ISFP", "INFP", "ESFP"],
-        "懐疑":   ["INTP", "ENTP", "INTJ"],
+        "pro":       ["ENFP", "ENTP", "ESFP"],
+        "con":       ["INFP", "ISFP", "INTP"],
+        "neutral":   ["ISFP", "INFP", "ESFP"],
+        "skeptical": ["INTP", "ENTP", "INTJ"],
     },
     "outsider": {
-        "推進派": ["ENTJ", "ESTJ", "ENTP"],
-        "反対派": ["ISTJ", "INTJ", "ISFJ"],
-        "中立":   ["ESTJ", "ESFJ", "ISTJ"],
-        "懐疑":   ["INTJ", "INTP", "ISTP"],
+        "pro":       ["ENTJ", "ESTJ", "ENTP"],
+        "con":       ["ISTJ", "INTJ", "ISFJ"],
+        "neutral":   ["ESTJ", "ESFJ", "ISTJ"],
+        "skeptical": ["INTJ", "INTP", "ISTP"],
     },
     "lurker": {
-        "推進派": ["INFJ", "INTJ", "INTP"],
-        "反対派": ["INFP", "INTP", "INTJ"],
-        "中立":   ["INFJ", "INFP", "INTP"],
-        "懐疑":   ["INTP", "INTJ", "ISTP"],
+        "pro":       ["INFJ", "INTJ", "INTP"],
+        "con":       ["INFP", "INTP", "INTJ"],
+        "neutral":   ["INFJ", "INFP", "INTP"],
+        "skeptical": ["INTP", "INTJ", "ISTP"],
     },
 }
 
-# ─── MBTI ガイダンス文（プロンプト共通） ────────────────────────────
+# ─── MBTI guidance text (shared in prompts) ────────────────────────────
 MBTI_GUIDANCE = """
-MBTIの選び方:
-- ENTJ/ESTJ: リーダー気質、目標志向、組織をまとめる
-- INTJ/INTP: 分析的、批判的思考、独立思考者
-- ENFP/ENTP: 創造的、新しいアイデア好き、議論好き
-- ISFJ/ISTJ: 堅実、伝統重視、規律正しい
-- INFP/INFJ: 理想主義、価値観重視、共感力高い
-- ESTP/ESFP: 行動派、実践重視、今この瞬間を生きる
-- ISFP: 芸術的、穏やか、自分のペースを大事にする
-- ESFJ: 社交的、人の役に立ちたい、調和重視
-各エージェントの役割・性格・年齢に合ったMBTIを選んでください。
-同じMBTIタイプが3人以上いないようにしてください。
+How to pick MBTI:
+- ENTJ/ESTJ: Leader type, goal-oriented, organizes others
+- INTJ/INTP: Analytical, critical thinker, independent
+- ENFP/ENTP: Creative, loves new ideas, enjoys debate
+- ISFJ/ISTJ: Reliable, tradition-oriented, disciplined
+- INFP/INFJ: Idealistic, value-driven, high empathy
+- ESTP/ESFP: Action-oriented, practical, lives in the moment
+- ISFP: Artistic, calm, goes at their own pace
+- ESFJ: Sociable, helpful, harmony-focused
+Choose MBTI that fits each agent's role, personality, and age.
+No more than 2 agents with the same MBTI type.
 """
 
-# ─── 年齢ガイダンス文（プロンプト共通） ────────────────────────────
+# ─── Age guidance text (shared in prompts) ────────────────────────────
 AGE_GUIDANCE = """
-年齢の目安（役割に合わせて設定）:
-- authority: 45-65歳（教授・管理職は年配）
-- worker: 30-50歳（現場の中堅）
-- youth: 18-28歳（学生・若手）
-- outsider: 35-55歳（企業・行政の実務者）
-- lurker: 20-70歳（幅広い）
-全員同じ年齢にしないこと。最低でも10歳以上の年齢差をつけること。
+Age guidelines (set according to role):
+- authority: 45-65 (professors, managers tend to be older)
+- worker: 30-50 (mid-career professionals)
+- youth: 18-28 (students, young workers)
+- outsider: 35-55 (corporate/government practitioners)
+- lurker: 20-70 (wide range)
+Don't make everyone the same age. At least 10+ years difference between agents.
 """
 
 
 def _select_mbti(tone: str, stance: str) -> str:
-    """役割（口調タイプ）と立場に適したMBTIをランダムに選択"""
+    """Select a random MBTI suitable for the given tone type and stance"""
     candidates = MBTI_ROLE_MAP.get(tone, {}).get(stance, MBTI_TYPES)
     return random.choice(candidates)
 
 
 def _deduplicate_mbti(llm_mbti: str, tone: str, existing_agents: list) -> str:
-    """MBTIが2人以上被らないようにする"""
+    """Ensure no more than 2 agents share the same MBTI"""
     used_mbtis = {}
     for a in existing_agents:
         used_mbtis[a.mbti] = used_mbtis.get(a.mbti, 0) + 1
 
-    # LLMが返したMBTIが被ってなければそのまま
+    # Use the LLM-returned MBTI if it's not overused
     if llm_mbti in MBTI_TYPES and used_mbtis.get(llm_mbti, 0) < 2:
         return llm_mbti
 
-    # 使われていないMBTIから選ぶ
+    # Pick from unused MBTIs
     available = [m for m in MBTI_TYPES if used_mbtis.get(m, 0) == 0]
     if not available:
         available = [m for m in MBTI_TYPES if used_mbtis.get(m, 0) < 2]
@@ -137,119 +138,118 @@ def _deduplicate_mbti(llm_mbti: str, tone: str, existing_agents: list) -> str:
 
 
 def _normalize_name(name: str) -> str:
-    """名前のスペース・全角半角を統一（スペースなし）"""
-    return name.replace(" ", "").replace("　", "").strip()
+    """Normalize name spacing"""
+    return name.replace("  ", " ").strip()
 
 
-def _generate_japanese_name(gender: str, used_names: Optional[set] = None) -> str:
-    """日本人名をランダム生成（重複回避付き、苗字被りも防止）"""
+def _generate_english_name(gender: str, used_names: Optional[set] = None) -> str:
+    """Generate a random English name (with deduplication, no repeated last names)"""
     if used_names is None:
         used_names = set()
     first_pool = FIRST_NAMES_M if gender == "male" else FIRST_NAMES_F
 
-    # 既に使われてる苗字を収集
+    # Collect already-used last names
     used_lasts = set()
     for n in used_names:
-        for last in LAST_NAMES:
-            if n.startswith(last):
-                used_lasts.add(last)
-                break
+        parts = n.split(" ")
+        if len(parts) >= 2:
+            used_lasts.add(parts[-1])
 
-    # 苗字が被らないように試行
+    # Try to avoid duplicate last names
     available_lasts = [l for l in LAST_NAMES if l not in used_lasts]
     if not available_lasts:
-        available_lasts = LAST_NAMES  # 全部使い切ったらリセット
+        available_lasts = LAST_NAMES  # Reset if all used
 
     for _ in range(50):
         last = random.choice(available_lasts)
         first = random.choice(first_pool)
-        name = f"{last}{first}"
+        name = f"{first} {last}"
         if name not in used_names:
             used_names.add(name)
             return name
 
-    name = f"{random.choice(available_lasts)}{random.choice(first_pool)}"
+    name = f"{random.choice(first_pool)} {random.choice(available_lasts)}"
     used_names.add(name)
     return name
 
 
-# ─── 掲示板投稿スタイル（5ch住民タイプ）────────────────────────────────
+# ─── Board posting styles (4chan anon types) ────────────────────────────────
 POSTING_STYLES = {
     "info_provider": {
-        "label": "情報提供者",
-        "description": "知識豊富、ソース付き、長文傾向。です/ます or だ/である調",
+        "label": "Info Provider",
+        "description": "Knowledgeable, cites sources, tends toward long posts. Informative tone.",
         "avg_length": "long",
         "anchor_rate": 0.3,
         "frequency": "medium",
         "weight": 0.10,
     },
     "debater": {
-        "label": "レスバ戦士",
-        "description": "攻撃的、反論好き、「お前」「はい論破」、短文連投",
+        "label": "Debater",
+        "description": "Aggressive, loves to argue, 'ur wrong', 'cope', short rapid-fire posts",
         "avg_length": "short",
         "anchor_rate": 0.7,
         "frequency": "high",
         "weight": 0.08,
     },
     "joker": {
-        "label": "ネタ師",
-        "description": "面白い一言、皮肉、比喩表現、ネットスラング多用",
+        "label": "Shitposter",
+        "description": "Funny one-liners, irony, memes, heavy use of net slang (kek, lmao, based)",
         "avg_length": "short",
         "anchor_rate": 0.2,
         "frequency": "medium",
         "weight": 0.10,
     },
     "questioner": {
-        "label": "質問者",
-        "description": "「〜ってどうなの？」「マジで？」素朴な疑問",
+        "label": "Questioner",
+        "description": "'Wait what?', 'Is this real?', naive genuine curiosity",
         "avg_length": "short",
         "anchor_rate": 0.4,
         "frequency": "low",
         "weight": 0.10,
     },
     "veteran": {
-        "label": "古参",
-        "description": "「にわかは黙ってろ」経験ベース、上から目線",
+        "label": "Oldfag",
+        "description": "'Lurk moar newfag', experience-based, condescending to newcomers",
         "avg_length": "medium",
         "anchor_rate": 0.3,
         "frequency": "medium",
         "weight": 0.05,
     },
     "passerby": {
-        "label": "通りすがり",
-        "description": "1-2回だけ投稿、感想述べて去る",
+        "label": "Passerby",
+        "description": "Posts 1-2 times, gives opinion, leaves",
         "avg_length": "short",
         "anchor_rate": 0.1,
         "frequency": "once",
         "weight": 0.15,
     },
     "emotional": {
-        "label": "感情的反応者",
-        "description": "「ワロタ」「マジかよ」「は？」感情ベースの短文",
+        "label": "Reactor",
+        "description": "'kek', 'lmao', 'wtf', 'holy shit' — emotion-driven short posts",
         "avg_length": "very_short",
         "anchor_rate": 0.5,
         "frequency": "medium",
         "weight": 0.15,
     },
     "storyteller": {
-        "label": "自分語り",
-        "description": "「俺の場合は〜」「うちでは〜」体験談ベース中〜長文",
+        "label": "Storyteller",
+        "description": "'greentext story time', 'this happened to me', medium-long anecdotes",
         "avg_length": "medium",
         "anchor_rate": 0.2,
         "frequency": "low",
         "weight": 0.10,
     },
     "agreeer": {
-        "label": "同意マン",
-        "description": "「それな」「これ」「ほんこれ」「>>X わかる」",
+        "label": "Agreefag",
+        "description": "'based', 'this', 'kek >>X', short agreement posts",
         "avg_length": "very_short",
         "anchor_rate": 0.6,
         "frequency": "medium",
         "weight": 0.12,
     },
     "contrarian": {
-        "label": "逆張り",
-        "description": "多数派と逆の意見、「みんな〜って言うけど実は〜」",
+        "label": "Contrarian",
+        "description": "Disagrees with majority, 'everyone says X but actually Y'",
         "avg_length": "medium",
         "anchor_rate": 0.4,
         "frequency": "medium",
@@ -268,41 +268,41 @@ TONE_POSTING_AFFINITY = {
 
 
 def _assign_posting_style() -> str:
-    """重み付きランダムで投稿スタイルを選択"""
+    """Select posting style via weighted random"""
     styles = list(POSTING_STYLES.keys())
     weights = [POSTING_STYLES[s]["weight"] for s in styles]
     return random.choices(styles, weights=weights, k=1)[0]
 
 
-# 口調タイプ定義
+# Tone type definitions
 TONE_STYLES = {
     "authority": {
-        "label": "権威層",
-        "description": "教授・部長・管理職。丁寧だが断定的。敬語ベース、長文。",
+        "label": "Authority",
+        "description": "Professor, manager, executive. Polite but assertive. Formal, long posts.",
         "post_interval_min": 3,
         "post_interval_max": 5,
     },
     "worker": {
-        "label": "実務層",
-        "description": "技術員・事務職・中間管理職。現場感のある標準語。です/ます混在。",
+        "label": "Worker",
+        "description": "Technician, office worker, middle management. Practical, down-to-earth.",
         "post_interval_min": 2,
         "post_interval_max": 3,
     },
     "youth": {
-        "label": "若手層",
-        "description": "学生・若手職員。なんJ寄りカジュアル。関西弁混じり。",
+        "label": "Youth",
+        "description": "Student, young adult. Casual, meme-heavy, greentext storyteller.",
         "post_interval_min": 1,
         "post_interval_max": 2,
     },
     "outsider": {
-        "label": "外部者",
-        "description": "業者・派遣会社・行政。ビジネス丁寧語。定型表現、本音を隠す。",
+        "label": "Outsider",
+        "description": "Contractor, corporate rep, bureaucrat. Business-speak, hides true opinions.",
         "post_interval_min": 5,
         "post_interval_max": 10,
     },
     "lurker": {
-        "label": "ROM専",
-        "description": "観察者。たまに鋭い一言。低頻度だが核心を突く。",
+        "label": "Lurker",
+        "description": "Observer. Rarely posts but cuts to the core when they do.",
         "post_interval_min": 10,
         "post_interval_max": 20,
     },
@@ -328,7 +328,7 @@ class OracleAgent:
     hidden_agenda: str
     trigger_topics: List[str]
     entity_type: str = "person"           # "person" | "organization" | "concept"
-    posting_style: str = "emotional"      # POSTING_STYLES のキー
+    posting_style: str = "emotional"      # key of POSTING_STYLES
     post_frequency: str = "medium"        # "once" | "low" | "medium" | "high"
     emotional_wound: str = ""
     information_bias: str = ""
@@ -365,13 +365,13 @@ class OracleAgent:
         }
 
 
-PERSON_PERSONA_PROMPT = """5ch住民のキャラ設計。JSONのみ返せ。
+PERSON_PERSONA_PROMPT = """Design a 4chan anon persona. Return JSON only.
 
-名前:{name} 説明:{description} 立場:{stance} 役割:{role}
-テーマ:{theme} 争点:{key_issues}
+Name:{name} Description:{description} Stance:{stance} Role:{role}
+Theme:{theme} Key Issues:{key_issues}
 
 JSON:
-{{"bio":"プロフ50字","persona":"性格と口調と立場を200字で","age":整数,"gender":"male/female","mbti":"XXXX","profession":"職業","interested_topics":["話題1","話題2"],"tone_style":"authority/worker/youth/outsider/lurker","stance":{{"position":"賛成/反対/中立","reason":"理由30字"}},"hidden_agenda":"本音30字","trigger_topics":["トピック1"]}}""".format(
+{{"bio":"profile 50 chars","persona":"personality, posting style, and stance in 200 chars","age":integer,"gender":"male/female","mbti":"XXXX","profession":"job","interested_topics":["topic1","topic2"],"tone_style":"authority/worker/youth/outsider/lurker","stance":{{"position":"pro/con/neutral","reason":"reason 30 chars"}},"hidden_agenda":"true motive 30 chars","trigger_topics":["topic1"]}}""".format(
     name="{name}",
     description="{description}",
     stance="{stance}",
@@ -380,13 +380,13 @@ JSON:
     key_issues="{key_issues}",
 )
 
-ORG_PERSONA_PROMPT = """組織の掲示板代表アカウント設計。JSONのみ返せ。
+ORG_PERSONA_PROMPT = """Design an organization's board representative account. Return JSON only.
 
-名前:{name} 説明:{description} 立場:{stance} 役割:{role}
-テーマ:{theme} 争点:{key_issues}
+Name:{name} Description:{description} Stance:{stance} Role:{role}
+Theme:{theme} Key Issues:{key_issues}
 
 JSON:
-{{"bio":"公式プロフ50字","persona":"組織の立場と発言スタイル200字","age":45,"gender":"other","mbti":"XXXX","profession":"職能","interested_topics":["分野1","分野2"],"tone_style":"authority/outsider","stance":{{"position":"公式立場","reason":"根拠30字"}},"hidden_agenda":"本音30字","trigger_topics":["トピック1"]}}""".format(
+{{"bio":"official profile 50 chars","persona":"org stance and posting style 200 chars","age":45,"gender":"other","mbti":"XXXX","profession":"function","interested_topics":["field1","field2"],"tone_style":"authority/outsider","stance":{{"position":"official stance","reason":"rationale 30 chars"}},"hidden_agenda":"true motive 30 chars","trigger_topics":["topic1"]}}""".format(
     name="{name}",
     description="{description}",
     stance="{stance}",
@@ -396,37 +396,40 @@ JSON:
 )
 
 
-def _is_valid_japanese_person_name(name: str) -> bool:
+def _is_valid_english_name(name: str) -> bool:
     """
-    名前が有効な日本人のフルネームかどうかを判定する。
-    - 最低2文字以上8文字以下
-    - 既知の姓リストに一致する接頭辞を持つ
-    - 概念語・役割語でないこと
+    Determine if the name is a valid English full name.
+    - At least 2 words, total length 3-40 chars
+    - Matches known last name pool with a first name prefix
+    - Not a concept/role word
     """
-    if not name or len(name) < 2 or len(name) > 8:
+    if not name or len(name) < 3 or len(name) > 40:
         return False
-    # 概念語・役割語ブラックリスト
+    # Concept/role word blacklist
     CONCEPT_WORDS = [
-        "大学", "学校", "学部", "研究", "自由", "環境", "経済", "政治", "科学",
-        "技術", "学生", "教員", "教授", "職員", "組合", "委員", "組織", "団体",
-        "企業", "会社", "行政", "市民", "住民", "支持", "反対", "推進", "慎重",
-        "保守", "革新", "保護", "利用", "推進派", "反対派", "懐疑派", "中立派",
-        "ベテラン", "若手", "管理職", "現場", "外部", "内部", "関係者",
+        "university", "school", "department", "research", "freedom", "environment",
+        "economy", "politics", "science", "technology", "student", "faculty",
+        "professor", "staff", "union", "committee", "organization", "group",
+        "enterprise", "company", "government", "citizen", "resident", "support",
+        "opposition", "promotion", "skeptic", "neutral", "veteran", "manager",
+        "outsider", "insider", "stakeholder",
     ]
+    name_lower = name.lower()
     for word in CONCEPT_WORDS:
-        if word in name:
+        if word in name_lower:
             return False
-    # 既知の姓リストに一致する接頭辞を持つかチェック
+    # Check that it contains a known last name and at least one first name part
+    parts = name.split()
+    if len(parts) < 2:
+        return False
     for last in LAST_NAMES:
-        if name.startswith(last) and len(name) > len(last):
+        if parts[-1] == last:
             return True
     return False
 
 
 def _make_username(name: str, agent_id: int) -> str:
-    """掲示板ID（コテハン）を生成"""
-    import unicodedata
-    # ASCII以外は除去してローマ字風に
+    """Generate a board handle (tripcode-style)"""
     clean = "".join(c for c in name if c.isascii() and (c.isalnum() or c in "_-"))
     if not clean:
         clean = f"agent{agent_id:03d}"
@@ -435,8 +438,8 @@ def _make_username(name: str, agent_id: int) -> str:
 
 
 def _parse_structured_persona(persona: str) -> dict:
-    """[tag]value|[tag]value形式のペルソナから個別セクションを抽出する。
-    自由文ペルソナにも対応（キーワードベースで部分抽出）"""
+    """Extract individual sections from [tag]value|[tag]value format.
+    Also handles free-text personas (keyword-based partial extraction)."""
     result = {
         "emotional_wound": "",
         "information_bias": "",
@@ -444,54 +447,54 @@ def _parse_structured_persona(persona: str) -> dict:
         "debate_tactics": "",
         "social_position": "",
     }
-    
+
     if not persona:
         return result
-    
-    # 自由文ペルソナからの簡易抽出（タグなし形式）
+
+    # Simple extraction from free-text persona (no tags)
     if "[" not in persona:
-        # 口癖らしきものを抽出（「〜」パターン）
         import re as _re
-        speech_matches = _re.findall(r'「([^」]{2,20})」', persona)
+        # Extract speech patterns from quoted phrases
+        speech_matches = _re.findall(r'"([^"]{2,30})"', persona)
+        if not speech_matches:
+            speech_matches = _re.findall(r"'([^']{2,30})'", persona)
         if speech_matches:
             result["speech_patterns"] = speech_matches[:4]
-        # トラウマ・コンプレックスキーワード
-        wound_kw = ["トラウマ", "コンプレックス", "恐れ", "不安", "経験から", "目撃した", "押し付け"]
+        # Trauma/complex keywords
+        wound_kw = ["trauma", "complex", "fear", "anxiety", "experienced", "witnessed", "forced"]
         for kw in wound_kw:
-            idx = persona.find(kw)
+            idx = persona.lower().find(kw)
             if idx != -1:
-                result["emotional_wound"] = persona[max(0,idx-20):idx+60].strip()
+                result["emotional_wound"] = persona[max(0, idx-20):idx+60].strip()
                 break
-        # 情報バイアス
-        bias_kw = ["日経", "朝日", "読売", "NHK", "Twitter", "5ch", "ネット", "専門誌", "現場の情報"]
+        # Information bias
+        bias_kw = ["reddit", "twitter", "4chan", "fox news", "cnn", "nyt", "wsj", "forums", "field data"]
         for kw in bias_kw:
-            if kw in persona:
+            if kw in persona.lower():
                 result["information_bias"] = kw
                 break
         return result
-    
-    # [tag]value|[tag]value... 形式をパース
+
+    # Parse [tag]value|[tag]value... format
     sections = persona.split("|")
     for section in sections:
         section = section.strip()
         if not section.startswith("["):
             continue
-        
-        # [tag]を抽出
+
         if "]" not in section:
             continue
         tag_end = section.index("]")
-        tag = section[1:tag_end]  # [と]を除去
+        tag = section[1:tag_end]
         value = section[tag_end+1:].strip()
-        
+
         if tag == "wound" and not result["emotional_wound"]:
             result["emotional_wound"] = value[:100]
         elif tag == "bias" and not result["information_bias"]:
             result["information_bias"] = value[:100]
         elif tag == "speech" and not result["speech_patterns"]:
-            # 「」や・で分割
             patterns = []
-            for sep in ["・", "、", "「", "」"]:
+            for sep in ["·", ",", '"', "'"]:
                 if sep in value:
                     patterns = [p.strip() for p in value.split(sep) if p.strip()]
                     break
@@ -500,52 +503,52 @@ def _parse_structured_persona(persona: str) -> dict:
             result["debate_tactics"] = value[:100]
         elif tag == "social" and not result["social_position"]:
             result["social_position"] = value[:100]
-    
+
     return result
 
 
 def _ensure_profession(prof: str, tone: str) -> str:
-    """職業が空・概念名の場合、toneに応じたデフォルトを返す"""
-    if prof and len(prof) >= 2 and prof not in ("不明", "なし", ""):
+    """Return a default profession by tone if the given one is empty or generic"""
+    if prof and len(prof) >= 2 and prof not in ("unknown", "none", ""):
         return prof
     defaults = {
-        "authority": random.choice(["大学教授", "学部長", "研究科長", "副学長", "部門長"]),
-        "worker": random.choice(["事務職員", "技術職員", "研究員", "図書館司書", "システム管理者"]),
-        "youth": random.choice(["大学生", "大学院生", "研究室学生", "学部3年生", "修士1年"]),
-        "outsider": random.choice(["IT企業社員", "フリーランス", "行政職員", "NPO職員", "記者"]),
-        "lurker": random.choice(["無職", "自営業", "主婦", "定年退職者", "パート"]),
+        "authority": random.choice(["University Professor", "Department Head", "Research Director", "VP of Research", "Dean"]),
+        "worker": random.choice(["Office Worker", "Technician", "Research Staff", "Librarian", "Systems Admin"]),
+        "youth": random.choice(["College Student", "Grad Student", "Research Assistant", "Junior Year", "Masters Student"]),
+        "outsider": random.choice(["IT Consultant", "Freelancer", "Government Official", "NGO Worker", "Journalist"]),
+        "lurker": random.choice(["Unemployed", "Self-employed", "Homemaker", "Retiree", "Part-timer"]),
     }
-    return defaults.get(tone, "会社員")
+    return defaults.get(tone, "Office Worker")
 
 
-# 立場の分散パターン（賛成・反対・中立をバランスよく）
+# Stance distribution pattern (balanced pro/con/neutral)
 STANCE_CYCLE = [
-    {"position": "賛成", "reason": "AI活用で教育の質が向上する"},
-    {"position": "反対", "reason": "学生の思考力が低下する恐れ"},
-    {"position": "中立", "reason": "条件付きで認めるべき"},
-    {"position": "反対", "reason": "不正行為の温床になる"},
-    {"position": "賛成", "reason": "時代の流れに逆らえない"},
-    {"position": "懐疑", "reason": "効果が不明で判断できない"},
-    {"position": "賛成", "reason": "業務効率化に不可欠"},
-    {"position": "反対", "reason": "プライバシーやセキュリティが心配"},
+    {"position": "pro", "reason": "AI adoption improves quality of life"},
+    {"position": "con", "reason": "Risks outweigh the benefits"},
+    {"position": "neutral", "reason": "Conditional acceptance is reasonable"},
+    {"position": "con", "reason": "Creates opportunities for abuse"},
+    {"position": "pro", "reason": "Can't fight the tide of progress"},
+    {"position": "skeptical", "reason": "Insufficient evidence to judge"},
+    {"position": "pro", "reason": "Essential for operational efficiency"},
+    {"position": "con", "reason": "Privacy and security concerns are real"},
 ]
 
 
 def _assign_stance(llm_stance: Any, idx: int, total: int) -> Dict[str, str]:
-    """立場を分散。LLMが返したらそれを使うが、全員同じにならないようcycleで補完"""
+    """Distribute stances. Use LLM stance if provided, else cycle to prevent everyone agreeing"""
     if isinstance(llm_stance, dict) and llm_stance.get("position"):
         return llm_stance
     return STANCE_CYCLE[idx % len(STANCE_CYCLE)]
 
 
 def _assign_tone(entity: Dict[str, Any]) -> str:
-    """エンティティ情報からデフォルトの口調タイプを推定"""
+    """Infer default tone type from entity info"""
     desc = (entity.get("description", "") + entity.get("attributes", {}).get("role", "")).lower()
-    if any(kw in desc for kw in ["教授", "部長", "管理", "執行", "理事", "学長", "長"]):
+    if any(kw in desc for kw in ["professor", "director", "manager", "executive", "head", "dean", "vp"]):
         return "authority"
-    if any(kw in desc for kw in ["学生", "若手", "２０代", "20代"]):
+    if any(kw in desc for kw in ["student", "youth", "young", "undergrad", "junior"]):
         return "youth"
-    if any(kw in desc for kw in ["業者", "派遣", "行政", "委員", "外部"]):
+    if any(kw in desc for kw in ["contractor", "vendor", "agency", "government", "committee", "external"]):
         return "outsider"
     if entity.get("type") in ("organization", "concept"):
         return "authority"
@@ -553,7 +556,7 @@ def _assign_tone(entity: Dict[str, Any]) -> str:
 
 
 def _replace_bad_agents(llm: "OracleLLMClient", theme: str, key_issues: list):
-    """bad評価のエージェントを削除して新しいエージェントに入れ替え"""
+    """Delete bad-rated agents and replace with new ones"""
     try:
         from db.database import db_conn
         with db_conn() as conn:
@@ -561,15 +564,15 @@ def _replace_bad_agents(llm: "OracleLLMClient", theme: str, key_issues: list):
             if not bad_rows:
                 return
             bad_names = [r["name"] for r in bad_rows]
-            print(f"[ProfileGenerator] 👎 {len(bad_names)}人を入れ替え: {', '.join(bad_names)}")
+            print(f"[ProfileGenerator] 👎 Replacing {len(bad_names)} agents: {', '.join(bad_names)}")
             for r in bad_rows:
                 conn.execute("DELETE FROM persistent_agents WHERE id=?", (r["id"],))
     except Exception as e:
-        print(f"[ProfileGenerator] bad入れ替え失敗: {e}")
+        print(f"[ProfileGenerator] Failed to replace bad agents: {e}")
 
 
 def _row_to_agent(row: dict, idx: int, total: int, key_issues: list) -> OracleAgent:
-    """DB行 → OracleAgent変換ヘルパー"""
+    """Convert DB row → OracleAgent"""
     topics = row.get("interested_topics", "[]")
     if isinstance(topics, str):
         try:
@@ -589,7 +592,7 @@ def _row_to_agent(row: dict, idx: int, total: int, key_issues: list) -> OracleAg
         age=row.get("age", 30),
         gender=row.get("gender", "other"),
         mbti=row.get("mbti", random.choice(MBTI_TYPES)),
-        country="日本",
+        country="USA",
         profession=row.get("profession", ""),
         interested_topics=topics if isinstance(topics, list) else key_issues[:3],
         tone_style=row.get("tone_style", "worker"),
@@ -610,26 +613,60 @@ _stock_agents_cache: Optional[List[dict]] = None
 
 
 def _load_stock_agents() -> List[dict]:
-    """stock_agents.json と stock_agents_real.json を結合して一度だけ読み込んでキャッシュ"""
+    """Load stock_agents.json only (public agents only).
+    Real agents (stock_agents_real.json / agents/private/) are not included.
+    """
     global _stock_agents_cache
     if _stock_agents_cache is None:
         agents_dir = _os.path.abspath(_os.path.join(_os.path.dirname(__file__), "..", "agents"))
         _stock_agents_cache = []
-        for fname in ["stock_agents.json", "stock_agents_real.json"]:
-            fpath = _os.path.join(agents_dir, fname)
-            if _os.path.exists(fpath):
-                with open(fpath, "r", encoding="utf-8") as f:
-                    loaded = json.load(f)
-                _stock_agents_cache.extend(loaded)
-                print(f"[ProfileGenerator] ✅ {fname} から {len(loaded)}名を読み込み")
-            else:
-                print(f"[ProfileGenerator] ℹ️ {fname} が見つかりません（スキップ）")
-        print(f"[ProfileGenerator] ✅ ストックエージェント合計 {len(_stock_agents_cache)}名を読み込み")
+        fpath = _os.path.join(agents_dir, "stock_agents.json")
+        if _os.path.exists(fpath):
+            with open(fpath, "r", encoding="utf-8") as f:
+                loaded = json.load(f)
+            _stock_agents_cache.extend(loaded)
+            print(f"[ProfileGenerator] ✅ Loaded {len(loaded)} agents from stock_agents.json")
+        else:
+            print(f"[ProfileGenerator] ℹ️ stock_agents.json not found")
+        print(f"[ProfileGenerator] ✅ Total stock agents: {len(_stock_agents_cache)} (public only)")
     return _stock_agents_cache
 
 
+_private_agents_cache: Optional[List[dict]] = None
+
+def _load_private_agents() -> List[dict]:
+    """Load all .json files under agents/private/ (real agents).
+    Not shown in listings but can be used when explicitly specified in simulations.
+    """
+    global _private_agents_cache
+    if _private_agents_cache is None:
+        private_dir = _os.path.abspath(_os.path.join(_os.path.dirname(__file__), "..", "agents", "private"))
+        _private_agents_cache = []
+        if _os.path.isdir(private_dir):
+            for fname in _os.listdir(private_dir):
+                if fname.endswith(".json"):
+                    fpath = _os.path.join(private_dir, fname)
+                    try:
+                        with open(fpath, "r", encoding="utf-8") as f:
+                            loaded = json.load(f)
+                        _private_agents_cache.extend(loaded)
+                        print(f"[ProfileGenerator] 🔒 Loaded {len(loaded)} agents from private/{fname}")
+                    except Exception as e:
+                        print(f"[ProfileGenerator] ⚠️ Failed to load private/{fname}: {e}")
+        # Deduplicate by name
+        seen = set()
+        deduped = []
+        for a in _private_agents_cache:
+            if a.get("name") not in seen:
+                seen.add(a.get("name"))
+                deduped.append(a)
+        _private_agents_cache = deduped
+        print(f"[ProfileGenerator] 🔒 Total private agents: {len(_private_agents_cache)}")
+    return _private_agents_cache
+
+
 def _stock_agent_to_oracle(s: dict, idx: int, total: int, key_issues: list, stance_override: Optional[dict] = None) -> OracleAgent:
-    """stock_agents.json の1エントリ → OracleAgent 変換"""
+    """Convert stock_agents.json entry → OracleAgent"""
     topics = s.get("interested_topics", [])
     if not isinstance(topics, list):
         topics = key_issues[:3]
@@ -645,7 +682,7 @@ def _stock_agent_to_oracle(s: dict, idx: int, total: int, key_issues: list, stan
         age=s.get("age", 30),
         gender=s.get("gender", "male"),
         mbti=s.get("mbti", random.choice(MBTI_TYPES)),
-        country="日本",
+        country="USA",
         profession=s.get("profession", ""),
         interested_topics=topics,
         tone_style=s.get("tone_style", "worker"),
@@ -665,9 +702,9 @@ def _stock_agent_to_oracle(s: dict, idx: int, total: int, key_issues: list, stan
 
 
 def _try_reuse_stock_agents(agent_count: int, key_issues: list) -> List[OracleAgent]:
-    """ストックエージェントからランダム選択して OracleAgent リストを返す。
-    DBにエージェントが存在する場合はDBのis_activeを優先する。"""
-    # まずDBからアクティブなエージェントを取得（is_active=1 のみ）
+    """Randomly select from stock agents and return as OracleAgent list.
+    If DB agents exist, prefer DB is_active flag."""
+    # First try to get active agents from DB (is_active=1 only)
     try:
         from db.database import get_persistent_agents
         db_agents = [a for a in get_persistent_agents(limit=200, include_bad=False) if a.get("is_active", 1) == 1]
@@ -676,12 +713,12 @@ def _try_reuse_stock_agents(agent_count: int, key_issues: list) -> List[OracleAg
             agents = []
             for idx, row in enumerate(selected):
                 agents.append(_row_to_agent(row, idx, len(selected), key_issues))
-            print(f"[ProfileGenerator] 📦 ストックエージェント(DB) {len(agents)}名を選択 (アクティブ:{len(db_agents)}名中)")
+            print(f"[ProfileGenerator] 📦 Selected {len(agents)} stock agents (DB) from {len(db_agents)} active")
             return agents
     except Exception as e:
-        print(f"[ProfileGenerator] DB取得失敗、JSONフォールバック: {e}")
+        print(f"[ProfileGenerator] DB fetch failed, falling back to JSON: {e}")
 
-    # DBが空またはエラーの場合はstock_agents.jsonから読み込み
+    # Fall back to stock_agents.json if DB is empty or errors
     stock = _load_stock_agents()
     if not stock:
         return []
@@ -689,26 +726,26 @@ def _try_reuse_stock_agents(agent_count: int, key_issues: list) -> List[OracleAg
     agents = []
     for idx, s in enumerate(selected):
         agents.append(_stock_agent_to_oracle(s, idx, len(selected), key_issues))
-    print(f"[ProfileGenerator] 📦 ストックエージェント(JSON) {len(agents)}名を選択")
+    print(f"[ProfileGenerator] 📦 Selected {len(agents)} stock agents (JSON)")
     return agents
 
 
 def _try_reuse_persistent_agents(scale: str, custom_agents: Optional[int], key_issues: list, theme: str) -> tuple:
-    """永続保存済みエージェントから再利用を試みる。
-    Returns: (reused_agents: list, shortage: int) — shortageが0なら全員揃った"""
+    """Try to reuse previously saved persistent agents.
+    Returns: (reused_agents: list, shortage: int) — shortage=0 means everyone is available"""
     try:
         from db.database import get_persistent_agents
         agent_count = custom_agents or {"mini": 5, "full": 12, "auto": 8}.get(scale, 8)
 
-        # bad評価のエージェントを先に削除
+        # Remove bad-rated agents first
         _replace_bad_agents(None, theme, key_issues)
 
         cached = [a for a in get_persistent_agents(limit=agent_count + 20, include_bad=False) if a.get("is_active", 1) == 1]
 
         if not cached:
-            return ([], agent_count)  # 全員新規生成
+            return ([], agent_count)  # Generate all new
 
-        # ランダムに選択（足りない分はshortageとして返す）
+        # Randomly select (return shortage for missing ones)
         selected = random.sample(cached, min(agent_count, len(cached)))
         agents = []
         for idx, row in enumerate(selected):
@@ -717,7 +754,7 @@ def _try_reuse_persistent_agents(scale: str, custom_agents: Optional[int], key_i
         shortage = max(0, agent_count - len(agents))
         return (agents, shortage)
     except Exception as e:
-        print(f"[ProfileGenerator] 永続エージェント再利用失敗: {e}")
+        print(f"[ProfileGenerator] Failed to reuse persistent agents: {e}")
         agent_count = custom_agents or {"mini": 5, "full": 12, "auto": 8}.get(scale, 8)
         return ([], agent_count)
 
@@ -731,47 +768,47 @@ def generate_agents(
     reuse_agents: bool = True,
 ) -> List[OracleAgent]:
     """
-    エンティティデータからエージェントを生成する。
-    reuse_agents=True の場合、永続保存済みエージェントを優先的に使い回す。
+    Generate agents from entity data.
+    If reuse_agents=True, prioritize reusing previously saved persistent agents.
     """
     entities = entity_data.get("entities", [])
     theme = entity_data.get("theme", "")
     key_issues = entity_data.get("key_issues", [])
 
-    # ストックエージェントを最優先で使用
+    # Stock agents take highest priority
     if reuse_agents:
         agent_count = custom_agents or {"mini": 5, "full": 12, "auto": 8}.get(scale, 8)
         stock_agents = _try_reuse_stock_agents(agent_count, key_issues)
         if stock_agents:
-            # スタンスをテーマに合わせて上書き
+            # Override stance to match theme
             for idx, agent in enumerate(stock_agents):
                 agent.stance = _assign_stance({}, idx, len(stock_agents))
-            print(f"[ProfileGenerator] 📦 ストックエージェント {len(stock_agents)}人で確定 ⚡")
+            print(f"[ProfileGenerator] 📦 Using {len(stock_agents)} stock agents ⚡")
             return stock_agents
 
-    # 永続エージェントの再利用を試みる（ストックが空の場合のフォールバック）
+    # Try to reuse persistent agents (fallback if stock is empty)
     reused_agents = []
     if reuse_agents:
         reused_agents, shortage = _try_reuse_persistent_agents(scale, custom_agents, key_issues, theme)
         if reused_agents and shortage == 0:
-            print(f"[ProfileGenerator] 永続エージェント {len(reused_agents)}人を再利用 ⚡")
+            print(f"[ProfileGenerator] Reusing {len(reused_agents)} persistent agents ⚡")
             return reused_agents
         elif reused_agents and shortage > 0:
-            print(f"[ProfileGenerator] 永続エージェント {len(reused_agents)}人を再利用 + {shortage}人を新規生成")
-            # 不足分は以下のフローで生成。custom_agentsをshortageに上書き
+            print(f"[ProfileGenerator] Reusing {len(reused_agents)} persistent agents + generating {shortage} new")
+            # Override custom_agents with shortage count
             custom_agents = shortage
             scale = "custom"
-        # reused_agents が空 → 全員新規生成（通常フロー続行）
+        # Empty reused_agents → generate all new (normal flow continues)
 
-    # agent_roles が指定されている場合はロールベース生成
+    # Role-based generation if agent_roles specified
     if agent_roles:
         print(
-            f"[ProfileGenerator] ロール指定モード: {sum(r.get('count', 1) for r in agent_roles)}エージェント",
+            f"[ProfileGenerator] Role-based mode: {sum(r.get('count', 1) for r in agent_roles)} agents",
             flush=True,
         )
         return _generate_agents_from_roles(agent_roles, theme, key_issues, llm)
 
-    # スケールに応じてエージェント数を決定
+    # Determine agent count by scale
     if scale == "mini":
         target_count = min(len(entities), 8)
     elif scale == "full":
@@ -779,21 +816,20 @@ def generate_agents(
     else:  # custom
         target_count = custom_agents or len(entities)
 
-    # エンティティが少なすぎる場合は全部使う
+    # Use all entities if fewer than needed
     selected = entities[:target_count] if len(entities) >= target_count else entities
 
-    # full/custom スケールではエンティティを拡張（同一エンティティから複数エージェント）
+    # Expand entities for full/custom scale (multiple agents from same entity)
     if scale in ("full", "custom") and len(entities) < target_count:
         extra_needed = target_count - len(entities)
-        # 既存エンティティを重複させて拡張（後で微妙に差分をつける）
         for i in range(extra_needed):
             base = entities[i % len(entities)].copy()
             base["name"] = f"{base['name']}_{i+2}"
             selected.append(base)
 
-    # --- バッチ生成: グループ化（4-5人ずつ）でAPI呼び出し削減 ---
+    # --- Batch generation: group 3 at a time to reduce API calls ---
     profiles_list = []
-    batch_size = 3  # Nemotron 30B: 3 agents per batch
+    batch_size = 3
     used_names: set = set()
 
     for batch_idx in range(0, len(selected), batch_size):
@@ -801,39 +837,38 @@ def generate_agents(
         batch_num = batch_idx // batch_size + 1
         total_batches = (len(selected) + batch_size - 1) // batch_size
 
-        print(f"[ProfileGenerator] バッチ {batch_num}/{total_batches}: {len(batch_entities)}エージェント生成中...")
+        print(f"[ProfileGenerator] Batch {batch_num}/{total_batches}: generating {len(batch_entities)} agents...")
 
-        # バッチ内エンティティ情報をまとめる（拡張版）
         entity_list_text_enhanced = "\n".join(
-            f"{i+1}. 【{e['name']}】type={e.get('type','person')} / "
-            f"説明:{e.get('description','')[:80]} / "
-            f"立場:{e.get('attributes',{}).get('stance','不明')} / "
-            f"口調:{e.get('_tone','worker')}"
+            f"{i+1}. [{e['name']}] type={e.get('type','person')} / "
+            f"desc:{e.get('description','')[:80]} / "
+            f"stance:{e.get('attributes',{}).get('stance','unknown')} / "
+            f"tone:{e.get('_tone','worker')}"
             for i, e in enumerate(batch_entities)
         )
 
-        batch_prompt = f"""テーマ「{theme}」（争点:{', '.join(key_issues[:2])}）の5ch住民ペルソナ。
+        batch_prompt = f"""Create 4chan anon personas for the theme "{theme}" (issues: {', '.join(key_issues[:2])}).
 
-口調タイプ:
-- authority: 教授・管理職。「〜と考えます」「結論から申し上げると」
-- worker: 技術員・事務職。「現場としては」「正直なところ」
-- youth: 学生・若手。なんJ語「草」「それな」「ワイは〜」
-- outsider: 外部者。「弊社としましては」「ご検討いただければ」
-- lurker: ROM専。短文「結局」「本質は」
+Tone types:
+- authority: Professor/manager. "In my professional opinion", "The evidence clearly shows"
+- worker: Technician/office. "From my experience", "Honestly though"
+- youth: Student/young. greentext, "kek", "based", "this desu"
+- outsider: Contractor/corp. "Our company's position is", "We'd like to suggest"
+- lurker: Observer. Short cuts: "This.", "The real issue is"
 
-投稿スタイル: info_provider/debater/joker/questioner/veteran/passerby/emotional/storyteller/agreeer/contrarian
+Posting styles: info_provider/debater/joker/questioner/veteran/passerby/emotional/storyteller/agreeer/contrarian
 
 {entity_list_text_enhanced}
 
-nameは日本人フルネーム必須（田中太郎形式）。概念名禁止。
-personaは[identity]〜|[backstory]〜|[personality]〜|[wound]〜|[speech]〜|[board]〜|[stance_detail]〜|[hidden]〜|[trigger]〜|[bias]〜|[social]〜|[tactics]〜|[memory]〜|[quirk]〜 の形式で800字以上書け。改行禁止。
+name MUST be a real English full name (e.g. John Smith). No concept names.
+persona must use format [identity]...|[backstory]...|[personality]...|[wound]...|[speech]...|[board]...|[stance_detail]...|[hidden]...|[trigger]...|[bias]...|[social]...|[tactics]...|[memory]...|[quirk]... (800+ chars, no line breaks).
 
-JSON配列で返せ（説明不要）:
-[{{"name":"田中太郎","bio":"プロフ80字以内","persona":"[identity]...の構造化ペルソナ800字以上","age":30,"gender":"male","mbti":"INTJ","profession":"職業","interested_topics":["話題1","話題2"],"tone_style":"worker","posting_style":"debater","stance":{{"position":"賛成","reason":"理由50字","confidence":0.7}},"hidden_agenda":"本音40字","trigger_topics":["トピック1","トピック2"],"emotional_wound":"トラウマ40字","information_bias":"信じる情報源40字","speech_patterns":["口癖1","口癖2","口癖3"],"debate_tactics":"議論戦略30字","social_position":"年収帯・世代40字"}}]"""
+Return JSON array only (no explanation):
+[{{"name":"John Smith","bio":"profile under 80 chars","persona":"[identity]...structured persona 800+ chars","age":30,"gender":"male","mbti":"INTJ","profession":"job","interested_topics":["topic1","topic2"],"tone_style":"worker","posting_style":"debater","stance":{{"position":"pro","reason":"reason 50 chars","confidence":0.7}},"hidden_agenda":"true motive 40 chars","trigger_topics":["topic1","topic2"],"emotional_wound":"trauma 40 chars","information_bias":"trusted source 40 chars","speech_patterns":["catchphrase1","catchphrase2","catchphrase3"],"debate_tactics":"strategy 30 chars","social_position":"income bracket, generation 40 chars"}}]"""
 
         try:
             messages = [
-                {"role": "system", "content": "JSON配列のみ返せ。説明不要。"},
+                {"role": "system", "content": "Return JSON array only. No explanation."},
                 {"role": "user", "content": batch_prompt},
             ]
             raw = llm.chat(messages, temperature=0.8)
@@ -841,11 +876,11 @@ JSON配列で返せ（説明不要）:
             if match:
                 batch_profiles = json.loads(match.group())
                 profiles_list.extend(batch_profiles)
-                print(f"[ProfileGenerator] バッチ {batch_num} 成功: {len(batch_profiles)}エージェント")
+                print(f"[ProfileGenerator] Batch {batch_num} success: {len(batch_profiles)} agents")
             else:
                 raise ValueError("JSON array not found")
         except Exception as e:
-            print(f"[ProfileGenerator] バッチ {batch_num} 失敗: {e} — フォールバック使用")
+            print(f"[ProfileGenerator] Batch {batch_num} failed: {e} — using fallback")
             for e_data in batch_entities:
                 profiles_list.append(
                     _fallback_profile(e_data, e_data.get("type") == "person", used_names)
@@ -853,7 +888,7 @@ JSON配列で返せ（説明不要）:
 
     agents = []
     for idx, entity in enumerate(selected):
-        # 一括生成結果からマッチするプロファイルを探す
+        # Find matching profile from batch results
         profile_data = None
         for p in profiles_list:
             if p.get("name") == entity["name"] or p.get("index") == idx + 1:
@@ -864,24 +899,23 @@ JSON配列で返せ（説明不要）:
         if profile_data is None:
             profile_data = _fallback_profile(entity, entity.get("type") == "person", used_names)
 
-        # personaから構造化セクションを抽出（LLMが個別フィールドで返さない場合のフォールバック）
+        # Extract structured sections from persona (fallback if LLM didn't return individual fields)
         persona_text = profile_data.get("persona", "")
         if persona_text:
             parsed_sections = _parse_structured_persona(persona_text)
-            # profile_dataにマージ（個別フィールドが空の場合のみ）
             for key, value in parsed_sections.items():
                 existing = profile_data.get(key)
                 is_empty = not existing or (isinstance(existing, list) and len(existing) == 0) or (isinstance(existing, str) and len(existing.strip()) == 0)
                 if is_empty and value:
                     profile_data[key] = value
-        
-        # フィールド補完（全エージェントを個性的に）
+
+        # Fill in fields (make each agent unique)
         attrs = entity.get("attributes", {})
-        # tone_style: LLM指定があればそれ、なければエンティティから推定、さらに無ければランダム
+        # tone_style: use LLM value if valid, else infer from entity, else random
         tone_style = profile_data.get("tone_style", "")
         if tone_style not in TONE_STYLES:
             tone_style = _assign_tone(entity)
-        # 全員同じtoneにならないよう、2人以上同じtoneなら強制変更
+        # Prevent all agents having the same tone — force change if 2+ already
         tone_counts = {}
         for a in agents:
             tone_counts[a.tone_style] = tone_counts.get(a.tone_style, 0) + 1
@@ -891,25 +925,25 @@ JSON配列で返せ（説明不要）:
                 available = [t for t in TONE_STYLES if tone_counts.get(t, 0) < 2]
             if available:
                 tone_style = random.choice(available)
-        # gender: LLM指定があればそれ、なければランダム（50:50）
+        # gender: use LLM value if valid, else random by tone
         gender = profile_data.get("gender", "")
         if gender not in ("male", "female"):
             gender = _pick_gender(tone_style)
-        # age: LLM指定があればそれ、なければtoneに応じたランダム
+        # age: use LLM value if available, else random by tone
         age = profile_data.get("age", random.randint(*AGE_RANGES.get(tone_style, (22, 55))))
 
-        # ── 名前の決定（全エージェントに日本人名を強制）──────────────
+        # ── Name determination (force English names for all agents) ──────────────
         llm_name = _normalize_name(profile_data.get("name", ""))
-        if llm_name and _is_valid_japanese_person_name(llm_name) and llm_name not in used_names:
+        if llm_name and _is_valid_english_name(llm_name) and llm_name not in used_names:
             name = llm_name
             used_names.add(name)
-        elif _is_valid_japanese_person_name(_normalize_name(entity.get("name", ""))) and _normalize_name(entity["name"]) not in used_names:
+        elif _is_valid_english_name(_normalize_name(entity.get("name", ""))) and _normalize_name(entity["name"]) not in used_names:
             name = _normalize_name(entity["name"])
             used_names.add(name)
         else:
-            # 概念名・組織名・重複 → 日本人名を生成
+            # Concept/org name or duplicate → generate English name
             gender_for_name = gender if gender in ("male", "female") else random.choice(["male", "female"])
-            name = _generate_japanese_name(gender_for_name, used_names)
+            name = _generate_english_name(gender_for_name, used_names)
 
         username = _make_username(name, idx)
 
@@ -931,7 +965,7 @@ JSON配列で返せ（説明不要）:
             age=int(age) if isinstance(age, (int, float)) else 30,
             gender=gender if gender in ("male", "female", "other") else "other",
             mbti=_deduplicate_mbti(profile_data.get("mbti", ""), tone_style, agents),
-            country=profile_data.get("country", "日本"),
+            country=profile_data.get("country", "USA"),
             profession=_ensure_profession(profile_data.get("profession", attrs.get("role", "")), tone_style),
             interested_topics=profile_data.get("interested_topics", key_issues[:3]),
             tone_style=tone_style,
@@ -950,16 +984,15 @@ JSON配列で返せ（説明不要）:
         )
         agents.append(agent)
 
-    # 永続エージェントの再利用分と結合
+    # Combine with reused persistent agents
     if reused_agents:
-        # IDを再割り当て（重複防止）
         for i, a in enumerate(agents):
             a.agent_id = len(reused_agents) + i
         all_agents = reused_agents + agents
-        print(f"[ProfileGenerator] 計{len(all_agents)}エージェント（再利用{len(reused_agents)} + 新規{len(agents)}）")
+        print(f"[ProfileGenerator] Total {len(all_agents)} agents (reused:{len(reused_agents)} + new:{len(agents)})")
         return all_agents
 
-    print(f"[ProfileGenerator] {len(agents)}エージェント生成完了")
+    print(f"[ProfileGenerator] {len(agents)} agents generated")
     return agents
 
 
@@ -970,24 +1003,24 @@ def _generate_agents_from_roles(
     llm: OracleLLMClient,
 ) -> List["OracleAgent"]:
     """
-    パラメータプランナーのロール指定からエージェントを生成する。
+    Generate agents from parameter planner role specs.
 
-    agent_roles 例:
-      [{"role": "大学教員", "tone": "authority", "stance": "推進派", "count": 2}, ...]
+    agent_roles example:
+      [{"role": "university professor", "tone": "authority", "stance": "pro", "count": 2}, ...]
     """
-    # ロールを個別エージェントスペックに展開
+    # Expand roles into individual agent specs
     specs: List[Dict[str, Any]] = []
     for role_spec in agent_roles:
         for _ in range(max(1, int(role_spec.get("count", 1)))):
             specs.append({
-                "role": role_spec.get("role", "参加者"),
+                "role": role_spec.get("role", "participant"),
                 "tone": role_spec.get("tone", "worker"),
-                "stance": role_spec.get("stance", "中立"),
+                "stance": role_spec.get("stance", "neutral"),
             })
 
-    # バッチ生成（5人ずつ）
+    # Batch generation (3 per batch)
     profiles_list: List[Dict[str, Any]] = []
-    batch_size = 3  # Nemotron 30B: 3 agents per batch
+    batch_size = 3
     used_names: set = set()
 
     for batch_idx in range(0, len(specs), batch_size):
@@ -996,30 +1029,30 @@ def _generate_agents_from_roles(
         total_batches = (len(specs) + batch_size - 1) // batch_size
 
         print(
-            f"[ProfileGenerator] ロールバッチ {batch_num}/{total_batches}: "
-            f"{len(batch_specs)}エージェント生成中...",
+            f"[ProfileGenerator] Role batch {batch_num}/{total_batches}: "
+            f"generating {len(batch_specs)} agents...",
             flush=True,
         )
 
         spec_list_text = "\n".join(
-            f"{i + 1}. 役割: {s['role']} / 口調: {s['tone']} / 立場: {s['stance']}"
+            f"{i + 1}. Role: {s['role']} / Tone: {s['tone']} / Stance: {s['stance']}"
             for i, s in enumerate(batch_specs)
         )
 
-        batch_prompt = f"""テーマ「{theme}」（争点:{', '.join(key_issues[:2])}）の5ch住民ペルソナ。
+        batch_prompt = f"""Create 4chan anon personas for the theme "{theme}" (issues: {', '.join(key_issues[:2])}).
 
 {spec_list_text}
 
-nameは日本人フルネーム必須（例:佐藤花子）。概念名禁止。
+name MUST be a real English full name (e.g. Jane Doe). No concept names.
 
-JSON配列で返せ:
-[{{"name":"佐藤花子","bio":"プロフ50字","persona":"性格口調立場200字","age":30,"gender":"female","mbti":"ENFP","profession":"職業","interested_topics":["話題"],"tone_style":"worker","stance":{{"position":"賛成","reason":"理由"}},"hidden_agenda":"本音","trigger_topics":["トピック"]}}]"""
+Return JSON array:
+[{{"name":"Jane Doe","bio":"profile 50 chars","persona":"personality, tone, stance 200 chars","age":30,"gender":"female","mbti":"ENFP","profession":"job","interested_topics":["topic"],"tone_style":"worker","stance":{{"position":"pro","reason":"reason"}},"hidden_agenda":"true motive","trigger_topics":["topic"]}}]"""
 
         try:
             messages = [
                 {
                     "role": "system",
-                    "content": "JSON配列のみ返せ。説明不要。",
+                    "content": "Return JSON array only. No explanation.",
                 },
                 {"role": "user", "content": batch_prompt},
             ]
@@ -1029,14 +1062,14 @@ JSON配列で返せ:
                 batch_profiles = json.loads(match.group())
                 profiles_list.extend(batch_profiles)
                 print(
-                    f"[ProfileGenerator] ロールバッチ {batch_num} 成功: {len(batch_profiles)}エージェント",
+                    f"[ProfileGenerator] Role batch {batch_num} success: {len(batch_profiles)} agents",
                     flush=True,
                 )
             else:
                 raise ValueError("JSON array not found")
         except Exception as e:
             print(
-                f"[ProfileGenerator] ロールバッチ {batch_num} 失敗: {e} — フォールバック使用",
+                f"[ProfileGenerator] Role batch {batch_num} failed: {e} — using fallback",
                 flush=True,
             )
             for s in batch_specs:
@@ -1044,7 +1077,7 @@ JSON配列で返せ:
                     _fallback_profile_from_spec(s, theme, key_issues, used_names)
                 )
 
-    # profiles_list → OracleAgent に変換
+    # Convert profiles_list → OracleAgent
     agents: List[OracleAgent] = []
     for idx, spec in enumerate(specs):
         profile_data = profiles_list[idx] if idx < len(profiles_list) else \
@@ -1054,13 +1087,13 @@ JSON配列で返せ:
         if tone_style not in TONE_STYLES:
             tone_style = spec["tone"]
 
-        # 名前: 日本人名を強制、重複排除
+        # Name: force English name, deduplicate
         name = profile_data.get("name", "")
-        if not name or name == spec["role"] or name in TONE_STYLES or not _is_valid_japanese_person_name(name) or name in used_names:
+        if not name or name == spec["role"] or name in TONE_STYLES or not _is_valid_english_name(name) or name in used_names:
             gender_hint = profile_data.get("gender", "")
             if gender_hint not in ("male", "female"):
                 gender_hint = _pick_gender(tone_style)
-            name = _generate_japanese_name(gender_hint, used_names)
+            name = _generate_english_name(gender_hint, used_names)
 
         username = _make_username(name, idx)
         age = profile_data.get("age", random.randint(*AGE_RANGES.get(tone_style, (22, 55))))
@@ -1078,7 +1111,7 @@ JSON配列で返せ:
             age=int(age) if isinstance(age, (int, float)) else 30,
             gender=gender if gender in ("male", "female", "other") else "other",
             mbti=_deduplicate_mbti(profile_data.get("mbti", ""), tone_style, agents),
-            country="日本",
+            country="USA",
             profession=_ensure_profession(profile_data.get("profession", ""), tone_style),
             interested_topics=profile_data.get(
                 "interested_topics", key_issues[:3] if key_issues else []
@@ -1094,7 +1127,7 @@ JSON配列で返せ:
         )
         agents.append(agent)
 
-    print(f"[ProfileGenerator] ロールベース生成完了: {len(agents)}エージェント", flush=True)
+    print(f"[ProfileGenerator] Role-based generation complete: {len(agents)} agents", flush=True)
     return agents
 
 
@@ -1104,36 +1137,35 @@ def _fallback_profile_from_spec(
     key_issues: List[str],
     used_names: Optional[set] = None,
 ) -> Dict[str, Any]:
-    """ロールスペックからフォールバックプロファイルを生成"""
+    """Generate fallback profile from role spec"""
     if used_names is None:
         used_names = set()
     tone = spec.get("tone", "worker")
-    stance = spec.get("stance", "中立")
-    role = spec.get("role", "参加者")
+    stance = spec.get("stance", "neutral")
+    role = spec.get("role", "participant")
 
-    # gender: tone別の確率分布
     gender = _pick_gender(tone)
-    name = _generate_japanese_name(gender, used_names)
+    name = _generate_english_name(gender, used_names)
     age = random.randint(*AGE_RANGES.get(tone, (25, 50)))
     mbti = _select_mbti(tone, stance)
 
     persona_snippets = {
-        "authority": f"大学・組織の管理職として{theme}に関わる。丁寧な言葉遣いだが主張は明確。",
-        "worker":    f"現場の実務担当として{theme}の影響を直接受ける立場にある。",
-        "youth":     f"学生・若手として{theme}に興味を持ち、自分なりの意見を発信する。",
-        "outsider":  f"外部の立場から{theme}を観察し、ビジネス視点で関与する。",
-        "lurker":    f"普段は静観しているが、{theme}の核心を鋭く突く発言をすることがある。",
+        "authority": f"A manager/academic involved with {theme}. Formal but assertive.",
+        "worker":    f"A field practitioner directly affected by {theme}.",
+        "youth":     f"A student/young adult interested in {theme}, sharing their own take.",
+        "outsider":  f"An external observer of {theme} engaging from a business perspective.",
+        "lurker":    f"Mostly silent, but cuts to the core of {theme} when they do post.",
     }
 
     return {
         "name": name,
-        "bio": f"{role}（{stance}）",
-        "persona": persona_snippets.get(tone, f"{role}として{theme}に関わる人物。立場: {stance}。"),
+        "bio": f"{role} ({stance})",
+        "persona": persona_snippets.get(tone, f"A {role} involved with {theme}. Stance: {stance}."),
         "age": age,
         "gender": gender,
         "mbti": mbti,
         "profession": role,
-        "interested_topics": (key_issues[:3] if key_issues else ["議論"]),
+        "interested_topics": (key_issues[:3] if key_issues else ["discussion"]),
         "tone_style": tone,
         "stance": {"position": stance, "reason": ""},
         "hidden_agenda": "",
@@ -1142,50 +1174,50 @@ def _fallback_profile_from_spec(
 
 
 def _fallback_profile(entity: Dict[str, Any], is_individual: bool, used_names=None) -> Dict[str, Any]:
-    """LLM失敗時のフォールバック（構造化ペルソナ付き）"""
+    """Fallback when LLM fails (with structured persona)"""
     attrs = entity.get("attributes", {})
     tone = _assign_tone(entity)
-    name = entity.get("name", "不明")
+    name = entity.get("name", "Unknown")
     description = entity.get("description", "")
-    stance = attrs.get("stance", "中立")
+    stance = attrs.get("stance", "neutral")
 
     speech_templates = {
-        "authority": ["結論から申し上げると", "エビデンスとしては", "私の立場からは"],
-        "worker": ["現場としては", "正直なところ", "実際やってみると"],
-        "youth": ["草", "それな", "ワイは"],
-        "outsider": ["弊社としましては", "ご検討いただければ", "一般論として"],
-        "lurker": ["結局", "本質は", "まあ"],
+        "authority": ["In my professional opinion", "The evidence clearly shows", "From my perspective"],
+        "worker": ["From my experience", "Honestly though", "In practice"],
+        "youth": ["kek", "based", "ngl"],
+        "outsider": ["Our position is", "We'd suggest", "Generally speaking"],
+        "lurker": ["This.", "The real issue is", "Well"],
     }
     speech = speech_templates.get(tone, [""])
 
     persona = (
-        f"[identity]{name}は{attrs.get('role', '関係者')}|"
-        f"[backstory]{description[:60] if description else 'テーマに関心がある'}|"
-        f"[personality]標準的な性格・論理的思考|"
-        f"[wound]特になし|"
-        f"[speech]{'・'.join(speech)}|"
-        f"[board]通常の頻度で書き込む|"
-        f"[stance_detail]立場:{stance}|"
-        f"[hidden]特になし|"
-        f"[trigger]批判されると反応|"
-        f"[bias]一般的なメディア|"
-        f"[social]一般的な立場|"
-        f"[tactics]論理的に反論|"
-        f"[memory]特筆すべきエピソードなし|"
-        f"[quirk]特になし"
+        f"[identity]{name} is a {attrs.get('role', 'stakeholder')}|"
+        f"[backstory]{description[:60] if description else 'Has interest in the topic'}|"
+        f"[personality]Logical thinker, standard personality|"
+        f"[wound]Nothing notable|"
+        f"[speech]{' · '.join(speech)}|"
+        f"[board]Posts at normal frequency|"
+        f"[stance_detail]Stance:{stance}|"
+        f"[hidden]Nothing notable|"
+        f"[trigger]Reacts when criticized|"
+        f"[bias]Mainstream media|"
+        f"[social]Average position|"
+        f"[tactics]Argues logically|"
+        f"[memory]No notable episodes|"
+        f"[quirk]Nothing notable"
     )
 
     candidates = TONE_POSTING_AFFINITY.get(tone, list(POSTING_STYLES.keys()))
     posting = random.choice(candidates)
 
     return {
-        "bio": description[:200] if description else f"{name}の公式アカウント",
+        "bio": description[:200] if description else f"{name}'s account",
         "persona": persona,
         "age": random.randint(25, 50) if is_individual else 30,
         "gender": "male" if is_individual else "other",
         "mbti": random.choice(MBTI_TYPES),
-        "profession": attrs.get("role", "関係者"),
-        "interested_topics": ["政策", "教育", "技術"],
+        "profession": attrs.get("role", "stakeholder"),
+        "interested_topics": ["policy", "education", "technology"],
         "tone_style": tone,
         "posting_style": posting,
         "stance": {"position": stance, "reason": "", "confidence": 0.5},
@@ -1194,14 +1226,14 @@ def _fallback_profile(entity: Dict[str, Any], is_individual: bool, used_names=No
         "emotional_wound": "",
         "information_bias": "",
         "speech_patterns": speech,
-        "debate_tactics": "状況に応じて対応",
+        "debate_tactics": "Responds to the situation",
         "social_position": "",
     }
 
 
 def _pick_gender(tone: str) -> str:
-    """口調タイプに応じた性別をランダム選択（確率分布付き）"""
-    # tone別の male 出現確率（残りは female）
+    """Randomly select gender by tone type (with probability distribution)"""
+    # Male probability per tone (remainder is female)
     male_prob = {
         "authority": 0.70,
         "worker":    0.60,

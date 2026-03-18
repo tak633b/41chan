@@ -1,6 +1,6 @@
 """
-Oracle 掲示板シミュレーター（5ch文化対応版）
-スレッド単位でシミュレーション。スレタイに沿った議論・リアルな5ch文化を再現。
+41chan Board Simulator (4chan culture edition)
+Thread-based simulation. Authentic 4chan board culture with shitposting, greentext, and imageboard lingo.
 """
 
 import json
@@ -15,7 +15,7 @@ from db.database import get_agent_past_posts
 
 
 def _extract_persona_sections(persona: str, sections: list) -> str:
-    """[tag]形式のペルソナから指定セクションを抽出して / 区切りで返す"""
+    """Extract specified sections from [tag]-format persona, return / separated"""
     result = []
     for section in sections:
         tag = f"[{section}]"
@@ -28,148 +28,144 @@ def _extract_persona_sections(persona: str, sections: list) -> str:
                 result.append(f"{section}:{content}")
     return " / ".join(result) if result else persona[:150]
 
-# 掲示板フォーマット定数
+# Board format constants
 BOARD_HEADER_TEMPLATE = """━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-【{board_name}】{thread_title}
+[{board_name}] {thread_title}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-テーマ: {theme}
-議題: {question}
+Theme: {theme}
+Topic: {question}
 """
 
-BATCH_ACTION_PROMPT_5CH = """あなたは丁寧なアシスタントではありません。5chの住民です。
+BATCH_ACTION_PROMPT_4CHAN = """[CRITICAL] You MUST write ONLY in English. Any response containing Japanese, Chinese, or other non-English text is a failure. ALL posts must be in English only.
 
-【板名】{board_name}
-【スレタイ】{thread_title}
-【テーマ】{theme}
-【議題/質問】{question}
-【ラウンド】{round_num}
+You are NOT a polite assistant. You are an anon on 4chan.
 
-【これまでの流れ（直近{history_count}件）】
+[Board] {board_name}
+[Thread Title] {thread_title}
+[Theme] {theme}
+[Topic/Question] {question}
+[Round] {round_num}
+
+[Recent Posts (last {history_count})]
 {recent_posts}
 
-【参加エージェント一覧】
+[Participating Anons]
 {agents_info}
 
-━━━━ 絶対ルール ━━━━
-■ 口調: 敬語・丁寧語は禁止。タメ口・ぞんざいな口調のみ。
-■ レス長の厳守:
-  - 1〜2行の超短いレス（「草」「それな」「ワロタ」「は？」「知らんがな」「嘘乙」「はい論破」など）: 60%以上
-  - 2〜3行の普通のレス: 30%程度
-  - 長文（3行超）: 10%以下。必ず先頭に「長文すまん」を付ける
-■ >>N でアンカー返信を積極的に使う（前の投稿を具体的に引用・反応する）
-■ 同意だけでなく、煽り・反論・茶化し・スルーを混ぜる
-■ AA OK: 「草」「ｗｗｗ」「キタ━━(ﾟ∀ﾟ)━━!!」など
-■ 5ch的表現を使う: 「草」「それな」「ワロタ」「マジで？」「嘘乙」「は？」「知らんがな」「ガチ勢か」「センス無い」
-■ 日本語のみ。英語は一切使うな。データや統計も日本語で書け。
-■ 「マジかよ 草 ワロタ」「それな」だけの投稿禁止。議題について具体的な内容を書け。
-■ 全員違う内容を書け。同じフレーズの繰り返し禁止。
-■ 冒頭フレーズの多様化: 同じ書き出しを連続させるな。冒頭は毎回違う表現にすること。前回と同じ1語目で始めるな。
+━━━━ ABSOLUTE RULES ━━━━
+■ Tone: No politeness. Casual, blunt, shitposting tone only.
+■ Post length enforcement:
+  - 1-2 line ultra-short posts ("kek", "based", "lmao", "cope", "seethe", "who asked"): 60%+
+  - 2-3 line normal replies: ~30%
+  - Long posts (3+ lines): max 10%. Must start with "long post incoming" or ">tfw"
+■ Use >>N anchor replies to specifically quote/react to prior posts
+■ Mix: agreement, shitposting, counterarguments, sarcasm, and ignoring
+■ 4chan lingo: kek, based, cringe, cope, seethe, anon, anons, lmao, lol, ngl, tbh, kekked, ngmi, wagmi, fren, OP, checked, trips, dubs
+■ Use greentext (>text) for reactions and storytelling
+■ English only. No Japanese. No Chinese.
+■ Don't post just "kek based lmao" with no substance — say something about the topic.
+■ Every anon posts different content. No repeated phrases.
+■ Vary opening lines: never start two consecutive posts the same way.
 
 {first_round_hint}
-今回は{post_count_target}件の投稿を生成してください。
-エージェント一覧から適切な人物を選んで発言させてください（同一エージェントが複数回発言してもよい）。
+Generate {post_count_target} posts now.
+Select appropriate anons from the list (same anon can post multiple times).
 
-出力は以下のJSON配列のみ（コードブロックや説明文は一切不要）:
+Output ONLY the following JSON array (no code blocks, no explanations):
 
 [
   {{
-    "agent_name": "エージェント名（上記一覧から選ぶ）",
-    "username": "名無しさん＠{board_name}",
-    "content": "投稿内容（敬語禁止、短く）",
+    "agent_name": "anon name (from the list above)",
+    "username": "Anonymous@{board_name}",
+    "content": "post content (casual, no politeness)",
     "anchor_to": null,
     "emotion": "neutral",
     "round_num": {round_num}
   }}
 ]
 
-anchor_to は直前のレス番号（整数、例: 3）または null。
-emotionは neutral/excited/angry/thoughtful/dismissive/amused のいずれか。
+anchor_to is the post number being replied to (integer, e.g. 3) or null.
+emotion is one of: neutral/excited/angry/thoughtful/dismissive/amused
 
-【AAの使い方】
-contentの末尾にAAを付けてよい。ただし「投稿の感情・内容と一致する場合のみ」「joker/emotional/agreeer タイプのみ」「30%以下の確率で」。
-意味が合わないなら付けない。AAの種類は感情に合わせること:
-- 興奮・キタ系: キタ━━━(ﾟ∀ﾟ)━━━!! ヽ(ﾟ∀ﾟ)ﾉ
-- 怒り・ゴルァ系: ヽ(`Д´)ﾉ ( ﾟДﾟ)ｺﾞﾙｧ!! m9(^Д^)
-- 笑い系: ( ´,_ゝ｀)プッ (´∀｀)ｗ
-- 落ち込み: orz OTL
-- 呆れ: (´・ω・｀) ( ﾟдﾟ)ﾊｧ?
-- 思案: （´-`）.｡oO
-必ずJSON配列のみで回答してください。"""
+[Greentext usage]
+Use >text for:
+- Storytelling: >be me >do thing >mfw
+- Reactions: >he actually thinks X
+- Irony: >implying X
+- Disagreement with prior post content
+Only use when it fits the post naturally."""
 
 
-# 投稿スタイル別の具体的指示（必ず議題の内容に触れること）
+# Style-specific instructions per posting style (must reference topic)
 STYLE_INSTRUCTIONS = {
-    "info_provider": "議題について具体的な数字・事例・ニュースを挙げて説明する。3〜6行。",
-    "debater":       ">>Nの意見の具体的な弱点・見落とし・反例を挙げて反論する。冒頭フレーズは毎回全く異なる視点から始めること。1〜3行。",
-    "joker":         "議題を茶化す・例え話にする。真面目に答えない。",
-    "questioner":    "議題について素朴な疑問を投げる。",
-    "veteran":       "上から目線で議題への持論を語る。経験ベース。",
-    "passerby":      "議題への率直な一言感想。1行で消える。",
-    "emotional":     "議題への感情的リアクション。内容に必ず触れること。短文だが具体的に言及すること。",
-    "storyteller":   "議題に関連する体験談を語る。具体的なエピソード。中文。",
-    "agreeer":       "直前の投稿の具体的な部分に同意する。相手の内容を引用して同意。",
-    "contrarian":    "多数派と逆の立場を取る。具体的な根拠付き。",
+    "info_provider": "Give specific numbers, examples, or news about the topic. 3-6 lines.",
+    "debater":       "Point out a specific weakness, oversight, or counterexample to >>N's argument. Start from a completely different angle each time. 1-3 lines.",
+    "joker":         "Make fun of the topic or use an analogy. Don't give a straight answer.",
+    "questioner":    "Ask a simple genuine question about the topic.",
+    "veteran":       "Share your experienced opinion on the topic condescendingly. Based on experience.",
+    "passerby":      "One-line gut reaction to the topic. Then disappear.",
+    "emotional":     "Emotional reaction to the topic. Must reference the actual content. Short but specific.",
+    "storyteller":   "Share a personal story related to the topic. Specific episode. Medium length.",
+    "agreeer":       "Agree with a specific part of the prior post. Quote what you agree with.",
+    "contrarian":    "Take the opposite side from the majority. With specific reasoning.",
 }
 
-# 感情別AAセット（5ch伝統 + 2ch AA辞典）
+# Emotion-based reactions (4chan style)
 AA_BY_EMOTION = {
     "excited": [
-        "キタ━━━(ﾟ∀ﾟ)━━━!!",
-        "ｷﾀ━(ﾟ∀ﾟ)━!",
-        "ヽ(ﾟ∀ﾟ)ﾉ",
-        "(´∀｀*)ウェ━ハハハ!!",
-        "+　　　+\n　 ∧＿∧ 　+\n　（0ﾟ・∀・）　　　ﾜｸﾜｸﾃｶﾃｶ\n　（0ﾟ∪ ∪ +\n　と＿_）__）　+",
-        " n ∧＿∧\n(ﾖ（´∀｀　） ｸﾞｯｼﾞｮﾌﾞ!\n　Y 　　　つ",
+        "HOLY SHIT",
+        "LET'S FUCKING GO",
+        "BASED",
+        "THIS IS THE GREATEST THING EVER",
+        ">mfw this actually happened",
     ],
     "angry": [
-        "ヽ(`Д´)ﾉ",
-        "( ﾟДﾟ)ｺﾞﾙｧ!!",
-        "m9(^Д^)",
-        "( `皿´)",
-        "　　 ∧∧　　／￣￣￣￣￣\n　(,,ﾟДﾟ)＜　ゴルァ！\n ⊂　　⊃　＼＿＿＿＿＿\n～|　　|\n　 し`J",
-        "　　＿＿＿_∧∧　　／￣￣￣￣￣￣￣￣\n～'　＿＿__(,,ﾟДﾟ)＜　逝ってよし！\n　 ＵU 　 　Ｕ U　　　＼＿＿＿＿＿＿＿＿",
-        "　 ∧＿∧　ﾊﾟｰﾝ\n（　・∀・）\n　　⊂彡☆))Д´)",
+        "FUCK YOU",
+        "ABSOLUTE GARBAGE",
+        ">seething rn",
+        "I HATE THIS SO MUCH",
+        "kys fr",
     ],
     "amused": [
-        "( ´,_ゝ｀)プッ",
-        "(´∀｀)ｗ",
-        "ﾌﾞﾌﾞｯ",
-        "（笑）",
-        " ∧＿∧　ﾊﾟｰﾝ\n（　・∀・）\n　　⊂彡☆))Д´)",
-        " ∧＿∧　　／￣￣￣￣￣\n（　´∀｀）＜　オマエモナー\n（　　　　） 　＼＿＿＿＿＿\n｜ ｜　|\n（_＿）＿）",
+        "kek",
+        "lmaooo",
+        "KEK",
+        ">he actually thought",
+        "I'm dead",
     ],
     "dismissive": [
-        "(´・ω・｀)",
-        "やれやれ (´-ω-｀)",
-        "( ﾟдﾟ)ﾊｧ?",
-        "しらんがな (´_ゝ｀)",
-        "　 ∧＿∧　　　／￣￣￣￣\n　（ ´･ω･)　＜　ショボーン\n　（ つ旦と）　　＼＿＿＿＿\n　と＿）＿）",
-        "　　( ﾟдﾟ )　ｶﾞﾀｯ\n　　.r　　 ヾ\n＿_|_|　/￣￣￣/＿\n　　＼/　　　　 /\n　　　　￣￣￣",
+        "cope",
+        "seethe",
+        "who asked",
+        "don't care didn't ask",
+        ">implying anyone cares",
     ],
     "thoughtful": [
-        "（´-`）.｡oO（…）",
-        "ﾑ(｀・ω・´)ﾑ",
-        "ﾒﾓﾒﾓ(ΦωΦ)ﾒﾓﾒﾓ",
-        " 　　　*　　　　　　*\n　＊　　　　　＋　　うそです\n 　　 n ∧＿∧　n\n＋　(ﾖ（* ´∀｀）E)\n 　 　 Y 　　　 Y　　　　＊",
-        "　 ∧＿∧ +　+\n（　・∀・）　　 +　　　\n（　　　　つ旦　　\n｜ ｜　|\n（_＿）＿）",
+        "hmm",
+        "ngl this makes me think",
+        ">tfw actually considering this",
+        "wait...",
     ],
     "neutral": [
-        "　 ∧＿∧\n　（　´∀｀）＜ ぬるぽ",
-        "　 　　　＿＿＿_\n　 　　　／　　 　 　＼\n　　　／　 _ノ 　ヽ､_　 ＼\n　 ／ oﾟ(（●）) (（●）)ﾟo ＼ \n　 |　　　　 （__人__）'　　　　|\n　 ＼　　 　　｀⌒´ 　 　 ／",
+        "ok",
+        "sure",
+        "whatever",
+        ">be me\n>reading this thread",
     ],
 }
-# 汎用・状況依存AA（落ち込み・驚き・定番レス）
+
+# General/situation-dependent reactions
 AA_GENERAL = [
-    "orz", "OTL", "Σ(ﾟДﾟ)", "(ry", "なんだこれ…w", "以上チラ裏",
-    "　　　 ∧ ∧＿__\n 　／(*ﾟーﾟ)　／＼\n／|￣∪∪￣|＼／\n 　|　 しぃ 　 |／\n 　 ￣￣￣￣",
-    "　　　　 　　／⌒ヽ\n⊂二二二（　＾ω＾）二⊃\n　　　　　　|　　　 / 　　　　　　ﾌﾞｰﾝ\n　　 　　　 （　ヽノ\n　　　　　　 ﾉ>ノ\n　　 三　　レﾚ",
-    "　 ∧＿∧\n　（　´∀｀）＜ ぬるぽ",
-    "　　Λ＿Λ　　＼＼\n　 （　・∀・）　　　|　|　ｶﾞｯ\n　と　　　　）　 　 |　|\n　　 Ｙ　/ノ　　　 人\n　　　 /　）　 　 < 　>_Λ∩\n　 ＿/し'　／／. Ｖ｀Д´）/\n　（＿フ彡　　　　　 　　/",
-    "　 ∩＿＿＿∩\n　　 | ノ　　　　　 ヽ\n　　/　　●　　　● |　クマ──！！\n　 |　　　　( _●_)　 ミ\n　彡､　　　|∪|　　､｀＼\n/　＿＿　 ヽノ　/´>　 )\n(＿＿＿）　　　/　(_／",
+    "kek", "lmao", "based", "cringe", "cope", "seethe",
+    ">he actually believes this",
+    ">mfw reading OP's post",
+    ">tfw no argument",
+    "not gonna make it",
+    "we're so back",
 ]
 
 def _ngram_jaccard(a: str, b: str, n: int = 3) -> float:
-    """文字n-gramのJaccard係数で類似度を計算（0.0〜1.0）"""
+    """Compute Jaccard similarity of character n-grams (0.0-1.0)"""
     if not a or not b:
         return 0.0
     set_a = {a[i:i+n] for i in range(len(a) - n + 1)}
@@ -180,7 +176,7 @@ def _ngram_jaccard(a: str, b: str, n: int = 3) -> float:
 
 
 def _is_too_similar(content: str, candidates: List[str], threshold: float = 0.35) -> bool:
-    """過去投稿リストのいずれかとthreshold以上類似していればTrue"""
+    """Return True if content is >= threshold similar to any candidate post"""
     for past in candidates:
         if _ngram_jaccard(content, past) >= threshold:
             return True
@@ -188,14 +184,14 @@ def _is_too_similar(content: str, candidates: List[str], threshold: float = 0.35
 
 
 def _similarity_score(content: str, candidates: List[str]) -> float:
-    """過去投稿との最大類似度スコアを返す"""
+    """Return max similarity score against past posts"""
     if not candidates:
         return 0.0
     return max(_ngram_jaccard(content, past) for past in candidates)
 
 
 def _maybe_aa(emotion: str, posting_style: str) -> str:
-    """posting_styleがjoker/emotionalの時だけランダムでAA挿入（30%確率）"""
+    """Insert reaction text only for joker/emotional/agreeer styles (30% chance)"""
     if posting_style not in ("joker", "emotional", "agreeer"):
         return ""
     if random.random() > 0.30:
@@ -204,33 +200,33 @@ def _maybe_aa(emotion: str, posting_style: str) -> str:
     return random.choice(candidates) if candidates else ""
 
 
-# アンカー率に応じたヒント
+# Anchor rate hint based on style
 def _anchor_hint(anchor_rate: float) -> str:
     if anchor_rate >= 0.5:
-        return "できるだけ>>Nでアンカーをつけて返信する。"
+        return "Reply to prior posts with >>N as much as possible."
     elif anchor_rate >= 0.3:
-        return "必要なら>>Nでアンカーをつける。"
+        return "Use >>N replies when appropriate."
     else:
-        return "アンカーは使わなくてもOK。"
+        return ">>N replies are optional."
 
 
-# 1人1ターン方式プロンプト（スタイル別）
-SINGLE_POST_PROMPT = """【匿名住人として投稿】
-立場: {stance_position} | タイプ: {style_label}
+# Single-post prompt (style-specific)
+SINGLE_POST_PROMPT = """[Anonymous posting]
+Stance: {stance_position} | Type: {style_label}
 {style_instruction}
 
-板: {board_name} | 議題: {question}
+Board: {board_name} | Topic: {question}
 
-【スレの流れ】
+[Thread so far]
 {recent_posts}
 
-{own_posts_hint}{extra_hint}■絶対ルール: 日本語のみ。英語禁止。敬語禁止。議題の具体的な内容に触れること。自分の過去の投稿と違う切り口で書け。投稿内容に人名を書くな（匿名掲示板）。冒頭フレーズを前回と変えること（同じ書き出しの繰り返し厳禁）。{anchor_hint}
-■AAは「joker/emotional/agreeer」タイプのみ、内容と感情が一致する場合だけ末尾に付けてよい（30%以下）。合わないなら付けない。
-JSON: {{"content":"投稿内容（末尾に意味が合うAAを付けてよい）","anchor_to":番号またはnull,"emotion":"neutral/excited/angry/amused/dismissive"}}"""
+{own_posts_hint}{extra_hint}■ ABSOLUTE RULES: English only. No Japanese. No politeness. Must reference the specific topic content. Write from a different angle than your past posts. Don't include real names in posts (anonymous board). Vary your opening line from last time (never repeat same opener). {anchor_hint}
+■ Greentext (>text) only for joker/emotional/agreeer types, only when emotionally fitting, end of post (30% max). Skip if it doesn't fit.
+JSON: {{"content":"post content (can end with fitting reaction)","anchor_to":number or null,"emotion":"neutral/excited/angry/amused/dismissive"}}"""
 
 
 class BoardSimulator:
-    """5ch文化対応 掲示板シミュレーター（スレッド単位）"""
+    """4chan culture imageboard simulator (thread-based)"""
 
     def __init__(
         self,
@@ -247,23 +243,23 @@ class BoardSimulator:
         on_post_generated: Optional[Any] = None,
     ):
         self.agents = agents
-        self.theme = entity_data.get("theme", "議論テーマ")
+        self.theme = entity_data.get("theme", "Discussion Topic")
         self.key_issues = entity_data.get("key_issues", [])
         self.question = question
         self.memory = memory_manager
         self.llm = llm
         self.scale = scale
-        self.board_name = board_name or "名無し板"
+        self.board_name = board_name or "random"
         self.thread_title = thread_title or self.theme
 
-        # ラウンド数の優先順位:
-        #   1. rounds_per_thread (パラメータプランナー決定値)
-        #   2. custom_rounds (ユーザー指定)
-        #   3. scale 固定値 (mini=2, full=5, それ以外=2)
-        if rounds_per_thread is not None:
-            self.num_rounds = rounds_per_thread
-        elif custom_rounds:
+        # Round count priority:
+        #   1. custom_rounds (user-specified) <- highest priority
+        #   2. rounds_per_thread (parameter planner value)
+        #   3. scale fixed value (mini=2, full=5, else=2)
+        if custom_rounds is not None and custom_rounds >= 1:
             self.num_rounds = custom_rounds
+        elif rounds_per_thread is not None:
+            self.num_rounds = rounds_per_thread
         elif scale == "mini":
             self.num_rounds = 2
         elif scale == "full":
@@ -274,23 +270,23 @@ class BoardSimulator:
         self.on_post_generated = on_post_generated
         self.posts: List[Dict[str, Any]] = []
         self.post_counter = 0
-        self._passerby_posted: set = set()  # 通りすがりエージェントの投稿済み追跡
+        self._passerby_posted: set = set()  # track passerby agents who already posted
 
-        # 疑似日時（掲示板の書き込み時刻）
+        # Pseudo-timestamps for posts
         self.base_time = datetime(2026, 3, 12, 9, 0, 0)
-        self.time_offset = 0  # 分単位
+        self.time_offset = 0  # in minutes
 
-        # 過去シミュレーション投稿キャッシュ（類似度チェック用）
-        # sim_idはSimulationRunnerから外部注入される想定。Noneなら全体から取得
+        # Past simulation post cache (for similarity checking)
+        # sim_id is injected externally by SimulationRunner. None = fetch from all sims
         self.sim_id: Optional[str] = None
-        self._past_posts_cache: Dict[str, List[str]] = {}  # agent_name → contents
+        self._past_posts_cache: Dict[str, List[str]] = {}  # agent_name -> contents
 
     # ------------------------------------------------------------------
-    # 過去投稿キャッシュ & 類似度チェック
+    # Past post cache & similarity checking
     # ------------------------------------------------------------------
 
     def _get_past_posts(self, agent_name: str) -> List[str]:
-        """エージェントの過去シミュ投稿をキャッシュ付きで取得"""
+        """Get agent's past simulation posts with caching"""
         if agent_name not in self._past_posts_cache:
             try:
                 self._past_posts_cache[agent_name] = get_agent_past_posts(
@@ -303,7 +299,7 @@ class BoardSimulator:
         return self._past_posts_cache[agent_name]
 
     def _get_current_sim_own_posts(self, agent_name: str) -> List[str]:
-        """今のシミュレーション内でそのエージェントが投稿した内容リストを返す"""
+        """Return list of content strings posted by agent in current simulation"""
         return [p["content"] for p in self.posts if p.get("agent_name") == agent_name]
 
     def _check_and_maybe_regenerate(
@@ -315,12 +311,12 @@ class BoardSimulator:
         max_retry: int = 1,
         extra_candidates: Optional[List[str]] = None,
     ) -> str:
-        """過去投稿・今シミュ内投稿（他エージェント含む）と類似していたら再生成（最大1回）"""
+        """Regenerate post if too similar to past posts (max 1 retry)"""
         past_db = self._get_past_posts(agent.name)
         past_cur = self._get_current_sim_own_posts(agent.name)
-        # 同一スレッド内の直近5投稿（他エージェント含む）もチェック対象に
+        # Also check last 5 posts in thread (including other agents)
         recent_all = [p["content"] for p in self.posts[-5:]]
-        # 同一バッチ内投稿も含める
+        # Include same-batch posts
         batch_posts = extra_candidates if extra_candidates else []
         all_past = past_db + past_cur + recent_all + batch_posts
 
@@ -331,14 +327,14 @@ class BoardSimulator:
             score = _similarity_score(content, all_past)
             if score < 0.45:
                 break
-            # 類似している実際の投稿を最大2件フィードバックとして渡す
+            # Pass top 2 similar posts as feedback for regeneration
             similar_examples = sorted(
                 all_past,
                 key=lambda p: _ngram_jaccard(content, p),
                 reverse=True,
             )[:2]
             forbidden_hint = "\n".join(f"- {s[:60]}" for s in similar_examples)
-            print(f"  [SimilarityCheck] {agent.name} 類似検出 score={score:.2f} (attempt {attempt+1}) — 再生成")
+            print(f"  [SimilarityCheck] {agent.name} similarity detected score={score:.2f} (attempt {attempt+1}) — regenerating")
             regen = self._generate_single_post(
                 agent, round_num, post_index,
                 forbidden_snippets=forbidden_hint,
@@ -351,22 +347,22 @@ class BoardSimulator:
         return content
 
     # ------------------------------------------------------------------
-    # メインループ
+    # Main loop
     # ------------------------------------------------------------------
 
     def _generate_thread_opener(self):
-        """>>1 スレ立て投稿をテンプレートで生成（LLMコール不要）"""
+        """Generate >>1 OP post via template (no LLM call needed)"""
         content = (
-            f"【{self.thread_title}】\n"
-            f"テーマ: {self.theme}\n\n"
-            f"おまいら語れ"
+            f"[{self.thread_title}]\n"
+            f"Theme: {self.theme}\n\n"
+            f"Discuss, anons."
         )
 
         post_time = self.base_time
-        username = f"名無しさん＠{self.board_name}"
+        username = f"Anonymous@{self.board_name}"
         post = {
             "num": 1,
-            "agent_name": "スレ主",
+            "agent_name": "OP",
             "username": username,
             "content": content,
             "round_num": 0,
@@ -377,40 +373,57 @@ class BoardSimulator:
         }
         self.posts.append(post)
         self.post_counter = 1
-        print(f"[BoardSim] >>1 スレ立て投稿生成完了")
+        print(f"[BoardSim] >>1 OP post generated")
 
-        # リアルタイム emit コールバック
+        # Real-time emit callback
         if self.on_post_generated:
             self.on_post_generated(post)
 
     def run(self) -> str:
-        """シミュレーションを実行し、掲示板ログ文字列を返す"""
-        print(f"\n[BoardSim] 開始: {self.num_rounds}ラウンド, {len(self.agents)}エージェント")
-        print(f"[BoardSim] 板: {self.board_name} | スレ: {self.thread_title}\n")
+        """Run simulation and return board log string"""
+        print(f"\n[BoardSim] Starting: {self.num_rounds} rounds, {len(self.agents)} anons")
+        print(f"[BoardSim] Board: {self.board_name} | Thread: {self.thread_title}\n")
 
-        # 過去投稿をバッチプリフェッチ（全エージェント分を一括取得）
+        # Pre-fetch past posts for all agents
         for agent in self.agents:
             self._get_past_posts(agent.name)
 
-        # >>1: スレ立て投稿（テンプレート生成）
+        # >>1: Generate OP post (template)
         self._generate_thread_opener()
 
         for round_num in range(self.num_rounds):
             print(f"[BoardSim] Round {round_num + 1}/{self.num_rounds}")
             self._process_batch(round_num)
 
-        print(f"[BoardSim] 完了: {self.post_counter}投稿生成\n")
+        print(f"[BoardSim] Done: {self.post_counter} posts generated\n")
+
+        # After sim: distill all agent experiences into long-term memory
+        print(f"[BoardSim] Starting long-term memory distillation...", flush=True)
+        for agent in self.agents:
+            agent_posts = [p["content"] for p in self.posts if p.get("agent_name") == agent.name]
+            if len(agent_posts) >= 2:
+                try:
+                    self.memory.distill_experience(
+                        agent_id=agent.name,
+                        sim_id=self.memory.project_id,
+                        theme=self.theme,
+                        all_posts=agent_posts,
+                    )
+                    print(f"[BoardSim] Long-term memory saved: {agent.name}", flush=True)
+                except Exception as e:
+                    print(f"[BoardSim] Long-term memory distillation failed {agent.name}: {e}", flush=True)
+
         return self._format_thread()
 
     # ------------------------------------------------------------------
-    # バッチ処理
+    # Batch processing
     # ------------------------------------------------------------------
 
     def _build_posting_sequence(self, round_num: int, target_count: int) -> List[OracleAgent]:
-        """べき乗則に基づいた投稿順序を生成（スタイル別頻度重み付き）"""
-        # frequency → 1ラウンドの最大投稿数
+        """Generate posting order using power-law distribution (style-frequency weighted)"""
+        # frequency -> max posts per round
         MAX_PER_ROUND = {"once": 1, "low": 1, "medium": 2, "high": 4}
-        # frequency → 重み（高頻度ほど多く選ばれる）
+        # frequency -> weight (higher frequency = more likely to be selected)
         FREQ_WEIGHT = {"once": 1, "low": 1, "medium": 3, "high": 6}
 
         agent_counts: Dict[str, int] = {}
@@ -423,7 +436,7 @@ class BoardSimulator:
             for agent in self.agents:
                 p_style = getattr(agent, "posting_style", "emotional")
                 freq = POSTING_STYLES.get(p_style, {}).get("frequency", "medium")
-                # 通りすがりはシミュレーション全体で1回のみ
+                # Passerby agents only post once per simulation
                 if freq == "once" and agent.name in self._passerby_posted:
                     continue
                 count = agent_counts.get(agent.name, 0)
@@ -435,11 +448,11 @@ class BoardSimulator:
             if not candidates:
                 break
 
-            # 連続同一エージェント防止: 直前と同じエージェントを除いた候補を優先
+            # Prevent consecutive same-agent posts: prefer non-repeat candidates
             last_agent = sequence[-1] if sequence else None
             if last_agent is not None:
                 non_repeat_candidates = [c for c in candidates if c.name != last_agent.name]
-                # 代替候補があれば使う。全員同じ（= 1人しかいない）場合は仕方なく許容
+                # Use alternates if available; if everyone is same agent, allow repeat
                 if non_repeat_candidates:
                     candidates = non_repeat_candidates
 
@@ -452,11 +465,11 @@ class BoardSimulator:
             if freq == "once":
                 self._passerby_posted.add(agent.name)
 
-            # バースト: レスバ戦士が即連投する（40%の確率）
-            # ただし連続2回まで（3連投は禁止）
+            # Burst: debater anons double-post (40% chance)
+            # Max 2 consecutive posts (no triple-posting)
             if freq == "high" and random.random() < 0.4:
                 cur = agent_counts.get(agent.name, 0)
-                # 直前が同一エージェントなら連投しない
+                # Don't burst if previous post was same agent
                 prev = sequence[-2] if len(sequence) >= 2 else None
                 already_consecutive = (prev is not None and prev.name == agent.name)
                 if cur < MAX_PER_ROUND.get("high", 4) and len(sequence) < target_count and not already_consecutive:
@@ -465,11 +478,11 @@ class BoardSimulator:
 
         return sequence[:target_count]
 
-    # バッチサイズ定数（1回のLLMコールで生成する投稿数）
+    # Batch size constant (posts per LLM call)
     BATCH_SIZE = 4
 
     def _process_batch(self, round_num: int):
-        """スタイル別頻度重み付きで投稿順を決定し、バッチ生成（BATCH_SIZE件ずつ）"""
+        """Determine posting order by style frequency and generate in batches (BATCH_SIZE at a time)"""
         if self.scale == "mini":
             post_count_target = random.randint(6, 8)
         else:
@@ -479,7 +492,7 @@ class BoardSimulator:
 
         i = 0
         while i < len(posting_agents):
-            # BATCH_SIZE件ずつバッチ生成
+            # Generate BATCH_SIZE posts at a time
             batch_end = min(i + self.BATCH_SIZE, len(posting_agents))
             batch_agents = posting_agents[i:batch_end]
 
@@ -490,7 +503,7 @@ class BoardSimulator:
                     continue
 
                 agent_name = post_data.get("agent_name", "")
-                # バッチ結果からエージェントを特定
+                # Find agent from batch results
                 agent = None
                 for a in batch_agents:
                     if a.name == agent_name:
@@ -500,7 +513,7 @@ class BoardSimulator:
                     agent = batch_agents[j]
 
                 content = post_data.get("content", "").strip()
-                # LLMが冒頭に >>N を出力することがある（anchor_to と二重になる）→ 除去
+                # LLM sometimes outputs >>N at the start (duplicate of anchor_to) — strip it
                 content = re.sub(r'^>>\d+\s*', '', content).strip()
                 if not content:
                     continue
@@ -509,7 +522,7 @@ class BoardSimulator:
                 self.time_offset += random.randint(2, 15)
                 post_time = self.base_time + timedelta(minutes=self.time_offset)
 
-                username = f"名無しさん＠{self.board_name}"
+                username = f"Anonymous@{self.board_name}"
 
                 anchor_to = post_data.get("anchor_to")
                 if anchor_to is not None:
@@ -535,7 +548,7 @@ class BoardSimulator:
                 }
                 self.posts.append(post)
 
-                # リアルタイムコールバック（定義されていれば呼ぶ）
+                # Real-time callback (call if defined)
                 if self.on_post_generated:
                     self.on_post_generated(post)
 
@@ -555,98 +568,135 @@ class BoardSimulator:
             i = batch_end
 
     def _generate_batch_posts(self, agents_batch: List[OracleAgent], round_num: int, start_index: int) -> List[Dict[str, Any]]:
-        """BATCH_SIZE人分の投稿を1回のLLM呼び出しで生成（各投稿は異なる内容）"""
+        """Generate posts for BATCH_SIZE anons in a single LLM call (each post different content)"""
         recent_posts = self._get_recent_posts(8)
 
         agent_specs = []
         for j, agent in enumerate(agents_batch):
             p_style = getattr(agent, "posting_style", "emotional")
             style_info = POSTING_STYLES.get(p_style, {})
-            style_label = style_info.get("label", "住人")
+            style_label = style_info.get("label", "anon")
             style_instruction = STYLE_INSTRUCTIONS.get(p_style, "")
             anchor_rate = style_info.get("anchor_rate", 0.3)
-            stance_pos = agent.stance.get("position", "中立") if isinstance(agent.stance, dict) else "中立"
-            speech_str = "、".join(agent.speech_patterns[:3]) if hasattr(agent, 'speech_patterns') and agent.speech_patterns else ""
+            stance_pos = agent.stance.get("position", "neutral") if isinstance(agent.stance, dict) else "neutral"
+            speech_str = ", ".join(agent.speech_patterns[:3]) if hasattr(agent, 'speech_patterns') and agent.speech_patterns else ""
             tactics_str = agent.debate_tactics if hasattr(agent, 'debate_tactics') and agent.debate_tactics else ""
-            # spec_lineには「内部ID」を使う（実名はcontentに漏れるのでここでは使わない）
-            anon_id = f"住人{j+1:02d}"
-            spec_line = f"{j+1}. {anon_id}（内部参照専用） | 立場:{stance_pos} | タイプ:{style_label} | {style_instruction}"
+            # Use anonymous ID (not real name in spec_line)
+            anon_id = f"Anon{j+1:02d}"
+            spec_line = f"{j+1}. {anon_id} (internal ref only) | Stance:{stance_pos} | Type:{style_label} | {style_instruction}"
             if speech_str:
-                spec_line += f" | 口癖:{speech_str}"
+                spec_line += f" | Catchphrases:{speech_str}"
             if tactics_str:
-                spec_line += f" | 議論戦略:{tactics_str}"
+                spec_line += f" | Debate tactic:{tactics_str}"
             agent_specs.append((agent.name, anon_id, spec_line))
 
-        # agent_specsはタプル (agent.name, anon_id, spec_line) のリスト
-        # agents_textにはanon_idを使い実名を渡さない
+        # agents_text uses anon IDs, not real names
         agents_text = "\n".join(spec_line for _, _, spec_line in agent_specs)
-        # 実名→anon_id のマッピング（後でname復元に使う）
+        # Real name -> anon_id mapping (for name restoration)
         name_to_anon = {name: anon_id for name, anon_id, _ in agent_specs}
         anon_to_name = {anon_id: name for name, anon_id, _ in agent_specs}
 
-        # >>1スレ立て投稿の直後（posts=1件）なら最初のレスは「>>1おつ」から始める
+        # First reply after OP should start with >>1 reply
         extra_hint = ""
         if round_num == 0 and start_index == 0 and len(self.posts) == 1:
-            extra_hint = "これはスレの最初のレス。「>>1おつ」から始めよ。\n"
+            extra_hint = "This is the first reply in the thread. Start with >>1 and acknowledge OP.\n"
 
         if len(agents_batch) == 1:
             agent = agents_batch[0]
             _, anon_id_single, spec_line_single = agent_specs[0]
             p_style = getattr(agent, "posting_style", "emotional")
             style_info = POSTING_STYLES.get(p_style, {})
-            style_label = style_info.get("label", "住人")
+            style_label = style_info.get("label", "anon")
             style_instruction = STYLE_INSTRUCTIONS.get(p_style, "")
-            stance_pos = agent.stance.get("position", "中立") if isinstance(agent.stance, dict) else "中立"
+            stance_pos = agent.stance.get("position", "neutral") if isinstance(agent.stance, dict) else "neutral"
             post_ctx = _extract_persona_sections(agent.persona, ["identity", "speech", "stance_detail", "tactics"])
-            speech_str = "、".join(agent.speech_patterns[:3]) if hasattr(agent, 'speech_patterns') and agent.speech_patterns else ""
+            speech_str = ", ".join(agent.speech_patterns[:3]) if hasattr(agent, 'speech_patterns') and agent.speech_patterns else ""
             tactics_str = agent.debate_tactics if hasattr(agent, 'debate_tactics') and agent.debate_tactics else ""
-            spec_line_full = f"1. {anon_id_single} | 立場:{stance_pos} | タイプ:{style_label} | {style_instruction}"
+            spec_line_full = f"1. {anon_id_single} | Stance:{stance_pos} | Type:{style_label} | {style_instruction}"
             if speech_str:
-                spec_line_full += f" | 口癖:{speech_str}"
+                spec_line_full += f" | Catchphrases:{speech_str}"
             if tactics_str:
-                spec_line_full += f" | 議論戦略:{tactics_str}"
-            spec_line_full += f"\nペルソナ: {post_ctx}"
-            # 自分の過去投稿（繰り返し防止）
+                spec_line_full += f" | Debate tactic:{tactics_str}"
+            spec_line_full += f"\nPersona: {post_ctx}"
+            # Past posts for this agent (repetition prevention)
             own_posts = [p for p in self.posts if p.get("agent_name") == agent.name]
             if own_posts:
                 own_snippets = [f"- {p['content'][:100]}" for p in own_posts[-5:]]
-                own_posts_hint = f"\n【{anon_id_single}の過去の投稿（同じ内容・フレーズは絶対禁止。全く異なる視点・切り口で書け）】\n" + "\n".join(own_snippets) + "\n"
+                own_posts_hint = f"\n[{anon_id_single}'s past posts (NEVER repeat same content/phrases. Write from a completely different angle)]\n" + "\n".join(own_snippets) + "\n"
             else:
                 own_posts_hint = ""
-            intro_line = f"次の人物が1投稿する。\n\n{spec_line_full}{own_posts_hint}"
+            # MemoryManager recall (short-term memory within simulation)
+            memory_hint = ""
+            try:
+                context_query = f"{self.question} {recent_posts[-200:]}"
+                memories = self.memory.recall(agent.name, context_query, top_k=3, current_round=round_num)
+                if memories:
+                    mem_lines = "\n".join(f"- {m['content'][:120]}" for m in memories)
+                    memory_hint = f"\n[{anon_id_single}'s long-term memory (past thoughts/feelings/realizations)]\n{mem_lines}\n"
+            except Exception:
+                pass
+            # Long-term memory (cross-simulation)
+            try:
+                lt_memories = self.memory.recall_longterm(agent.name, context_query, top_k=2)
+                if lt_memories:
+                    lt_lines = "\n".join(f"- {m['content'][:150]}" for m in lt_memories)
+                    memory_hint += f"\n[{anon_id_single}'s memories from past simulations]\n{lt_lines}\n"
+            except Exception:
+                pass
+            intro_line = f"The following anon posts one reply.\n\n{spec_line_full}{own_posts_hint}{memory_hint}"
         else:
-            # 複数エージェントの場合も各自の過去投稿ヒントを追加
+            # Multiple agents: include past post hints + long-term memory for each
             own_posts_hints = []
             for agent, (_, anon_id_m, _) in zip(agents_batch, agent_specs):
                 own_posts = [p for p in self.posts if p.get("agent_name") == agent.name]
+                hints = []
                 if own_posts:
                     own_snippets = [f"  - {p['content'][:80]}" for p in own_posts[-5:]]
-                    own_posts_hints.append(f"【{anon_id_m}の過去投稿（繰り返し禁止・違う切り口で）】\n" + "\n".join(own_snippets))
+                    hints.append(f"[{anon_id_m}'s past posts (no repeats, write from different angle)]\n" + "\n".join(own_snippets))
+                # MemoryManager recall (short-term)
+                try:
+                    context_query = f"{self.question} {recent_posts[-200:]}"
+                    memories = self.memory.recall(agent.name, context_query, top_k=2, current_round=round_num)
+                    if memories:
+                        mem_lines = "\n".join(f"  - {m['content'][:100]}" for m in memories)
+                        hints.append(f"[{anon_id_m}'s long-term memory]\n{mem_lines}")
+                except Exception:
+                    pass
+                # Long-term memory (cross-simulation)
+                try:
+                    lt_memories = self.memory.recall_longterm(agent.name, context_query, top_k=1)
+                    if lt_memories:
+                        lt_lines = "\n".join(f"  - {m['content'][:100]}" for m in lt_memories)
+                        hints.append(f"[{anon_id_m}'s past simulation memories]\n{lt_lines}")
+                except Exception:
+                    pass
+                if hints:
+                    own_posts_hints.append("\n".join(hints))
             own_hints_str = ("\n\n" + "\n".join(own_posts_hints)) if own_posts_hints else ""
-            intro_line = f"以下の{len(agents_batch)}人がそれぞれ1投稿する。\n\n{agents_text}{own_hints_str}"
+            intro_line = f"The following {len(agents_batch)} anons each post one reply.\n\n{agents_text}{own_hints_str}"
 
         batch_prompt = f"""{intro_line}
 
-板: {self.board_name} | 議題: {self.question}
-【スレの流れ】
-{recent_posts if recent_posts else "（まだ発言なし）"}
+Board: {self.board_name} | Topic: {self.question}
+[Thread so far]
+{recent_posts if recent_posts else "(no posts yet)"}
 
-■絶対ルール:
-- 日本語のみ。英語は一切使うな。
-- 敬語禁止。タメ口のみ。
-- 議題「{self.question}」の具体的な内容に必ず触れろ。
-- 「マジかよ 草 ワロタ」「それな」だけの投稿禁止。議題について何か言え。
-- 自分の過去投稿と同じ文言・フレーズの繰り返し禁止。毎回完全に違う切り口で書け。
-- 前の投稿と同じフレーズの繰り返し禁止。全員違う内容を書け。
-- 投稿内容に人名・固有名詞を書くな。匿名掲示板なので名前で呼ぶのは禁止。
-- 冒頭フレーズを前回と絶対に変えること。同じ書き出しの繰り返し厳禁。毎回全く別の切り口から始めることを意識しろ。同じパターンの反論文1語目を変えただけの繰り返し厳禁。
-- ★重要: 各投稿は必ず異なる内容・視点・切り口にせよ。同じ話題を繰り返すな。
+■ ABSOLUTE RULES:
+- English only. No Japanese.
+- No politeness. Casual anon tone only.
+- Must reference something specific about "{self.question}".
+- Don't just post "kek based lmao" — say something about the topic.
+- No repeated phrases from your own past posts. Write from a completely different angle.
+- Every anon posts different content. No shared phrases.
+- Don't include real names or identifying info in post content. Anonymous board.
+- Vary your opening line from last time. Never start two consecutive posts with the same word/phrase.
+- IMPORTANT: Each post must have unique content/perspective/angle.
 
-{extra_hint}JSON配列で返せ（nameは住人IDのみ、contentに名前を含めるな）:
-[{{"name":"住人ID（上記一覧から）","content":"投稿内容（名前を含めるな）","anchor_to":番号またはnull,"emotion":"neutral/excited/angry/amused/dismissive"}}]"""
+{extra_hint}Return as JSON array (name = anon ID only, don't include names in content):
+[{{"name":"AnonID (from list above)","content":"post content (no names in content)","anchor_to":number or null,"emotion":"neutral/excited/angry/amused/dismissive"}}]"""
 
         messages = [
-            {"role": "system", "content": "5chの住民として日本語のみで投稿する。英語禁止。JSON配列のみ返す。投稿内容に人名を絶対に含めるな。"},
+            {"role": "system", "content": "[CRITICAL] ALL output MUST be in English only. No Japanese. No Chinese. Post as an anonymous imageboard user. Return only JSON array. Never include real names in post content."},
             {"role": "user", "content": batch_prompt},
         ]
 
@@ -655,7 +705,7 @@ class BoardSimulator:
             match = re.search(r'\[[\s\S]*?\]', raw)
             if match:
                 posts = json.loads(match.group())
-                # anon_id → 実名に復元してagent_nameを正しく設定
+                # Restore anon_id -> real name for agent_name field
                 result = []
                 for i, post_data in enumerate(posts[:len(agents_batch)]):
                     anon_name = post_data.get("name", "")
@@ -668,8 +718,8 @@ class BoardSimulator:
             else:
                 raise ValueError("JSON array not found")
         except Exception as e:
-            print(f"  [BatchPost] バッチ生成失敗: {e} — 個別フォールバック")
-            # フォールバック: 1人ずつ生成
+            print(f"  [BatchPost] Batch generation failed: {e} — falling back to individual generation")
+            # Fallback: generate one at a time
             results = []
             for j, agent in enumerate(agents_batch):
                 post = self._generate_single_post(agent, round_num, start_index + j)
@@ -678,55 +728,73 @@ class BoardSimulator:
             return results
 
     def _generate_single_post(self, agent: OracleAgent, round_num: int, post_index: int, forbidden_snippets: str = "") -> Optional[Dict[str, Any]]:
-        """1エージェントの1投稿を生成（posting_style考慮）— フォールバック用"""
+        """Generate a single post for one agent (posting_style aware) — fallback"""
         recent_posts = self._get_recent_posts(8)
 
         p_style = getattr(agent, "posting_style", "emotional")
         style_info = POSTING_STYLES.get(p_style, {})
-        style_label = style_info.get("label", "住人")
+        style_label = style_info.get("label", "anon")
         style_instruction = STYLE_INSTRUCTIONS.get(p_style, "")
         anchor_rate = style_info.get("anchor_rate", 0.3)
         anchor_hint = _anchor_hint(anchor_rate)
 
         extra_hint = ""
         if round_num == 0 and post_index == 0 and len(self.posts) == 1:
-            extra_hint = "これはスレの最初のレス。「>>1おつ」から始めよ。\n"
+            extra_hint = "This is the first reply in the thread. Start with >>1 and acknowledge OP.\n"
 
-        # 自分の過去投稿を取得（繰り返し防止用）
+        # Get own past posts (for repetition prevention)
         own_posts = [p for p in self.posts if p.get("agent_name") == agent.name]
         own_posts_hint = ""
         if own_posts:
             own_snippets = [f"- {p['content'][:80]}" for p in own_posts[-5:]]
-            own_posts_hint = f"【自分の過去の投稿（これと違う内容を書け）】\n" + "\n".join(own_snippets) + "\n\n"
+            own_posts_hint = f"[Your past posts (write something DIFFERENT from these)]\n" + "\n".join(own_snippets) + "\n\n"
         if forbidden_snippets:
-            own_posts_hint += f"【特にこれと似た内容を書くな（再生成）】\n{forbidden_snippets}\n\n"
+            own_posts_hint += f"[Especially avoid content similar to these (regeneration)]\n{forbidden_snippets}\n\n"
+
+        # MemoryManager recall (short-term memory within simulation)
+        try:
+            context_query = f"{self.question} {recent_posts[-200:]}"
+            memories = self.memory.recall(agent.name, context_query, top_k=3, current_round=round_num)
+            if memories:
+                mem_lines = "\n".join(f"- {m['content'][:120]}" for m in memories)
+                own_posts_hint += f"[Long-term memory (past thoughts/feelings/realizations)]\n{mem_lines}\n\n"
+        except Exception:
+            pass
+        # Long-term memory (cross-simulation)
+        try:
+            lt_memories = self.memory.recall_longterm(agent.name, context_query, top_k=2)
+            if lt_memories:
+                lt_lines = "\n".join(f"- {m['content'][:150]}" for m in lt_memories)
+                own_posts_hint += f"[Memories from past simulations]\n{lt_lines}\n\n"
+        except Exception:
+            pass
 
         reply_ctx = _extract_persona_sections(agent.persona, ["trigger", "tactics", "hidden", "wound"])
-        speech_str = "、".join(agent.speech_patterns[:3]) if hasattr(agent, 'speech_patterns') and agent.speech_patterns else ""
+        speech_str = ", ".join(agent.speech_patterns[:3]) if hasattr(agent, 'speech_patterns') and agent.speech_patterns else ""
         tactics_str = agent.debate_tactics if hasattr(agent, 'debate_tactics') and agent.debate_tactics else ""
         extra_persona = ""
         if speech_str:
-            extra_persona += f"口癖:{speech_str} "
+            extra_persona += f"Catchphrases:{speech_str} "
         if tactics_str:
-            extra_persona += f"議論戦略:{tactics_str} "
+            extra_persona += f"Debate tactic:{tactics_str} "
         if reply_ctx:
-            extra_persona += f"ペルソナ:{reply_ctx}"
+            extra_persona += f"Persona:{reply_ctx}"
 
         messages = [
             {
                 "role": "system",
-                "content": "5chの住民として日本語のみで投稿する。英語禁止。JSONのみ返す。",
+                "content": "[CRITICAL] ALL output MUST be in English only. No Japanese. No Chinese. Post as an anonymous imageboard user. Return only JSON.",
             },
             {
                 "role": "user",
                 "content": SINGLE_POST_PROMPT.format(
                     board_name=self.board_name,
                     question=self.question,
-                    stance_position=agent.stance.get("position", "中立"),
+                    stance_position=agent.stance.get("position", "neutral") if isinstance(agent.stance, dict) else "neutral",
                     style_label=style_label,
                     style_instruction=style_instruction,
                     anchor_hint=anchor_hint,
-                    recent_posts=recent_posts if recent_posts else "（まだ発言なし）",
+                    recent_posts=recent_posts if recent_posts else "(no posts yet)",
                     extra_hint=extra_hint + (f"{extra_persona}\n" if extra_persona else ""),
                     own_posts_hint=own_posts_hint,
                 ),
@@ -735,7 +803,7 @@ class BoardSimulator:
 
         try:
             raw = self.llm.chat(messages, temperature=0.9)
-            # JSON抽出
+            # Extract JSON
             cleaned = re.sub(r"```(?:json)?\s*\n?", "", raw, flags=re.IGNORECASE)
             cleaned = re.sub(r"\n?```\s*$", "", cleaned).strip()
             match = re.search(r'\{[\s\S]*\}', cleaned)
@@ -744,26 +812,26 @@ class BoardSimulator:
                 data["agent_name"] = agent.name
                 return data
             else:
-                print(f"  [{agent.name}] JSON抽出失敗: {raw[:100]}")
+                print(f"  [{agent.name}] JSON extraction failed: {raw[:100]}")
                 return None
         except Exception as e:
-            print(f"  [{agent.name}] 生成失敗: {e}")
+            print(f"  [{agent.name}] Generation failed: {e}")
             return None
 
     # ------------------------------------------------------------------
-    # JSON配列パーサー
+    # JSON array parser
     # ------------------------------------------------------------------
 
     def _parse_posts_from_llm(self, content: str) -> List[Dict[str, Any]]:
-        """LLM応答からJSON配列 [{...}] を抽出"""
-        # コードブロックを除去
+        """Extract JSON array [{...}] from LLM response"""
+        # Strip code blocks
         cleaned = re.sub(r"```(?:json)?\s*\n?", "", content, flags=re.IGNORECASE)
         cleaned = re.sub(r"\n?```\s*$", "", cleaned).strip()
 
-        # [{...}] 形式のJSON配列を抽出（最初の [ から最後の ] まで）
+        # Extract [{...}] JSON array (from first [ to last ])
         match = re.search(r'\[[\s\S]*\]', cleaned)
         if not match:
-            print(f"[BoardSim] JSON配列が見つかりません。応答先頭200字: {content[:200]}")
+            print(f"[BoardSim] JSON array not found. Response first 200 chars: {content[:200]}")
             return []
 
         json_str = match.group(0)
@@ -772,7 +840,7 @@ class BoardSimulator:
             if isinstance(posts, list):
                 return posts
         except json.JSONDecodeError:
-            # 制御文字を除去して再試行
+            # Remove control chars and retry
             json_str_clean = re.sub(r"[\x00-\x1f\x7f-\x9f]", " ", json_str)
             json_str_clean = re.sub(r"\s+", " ", json_str_clean)
             try:
@@ -780,23 +848,23 @@ class BoardSimulator:
                 if isinstance(posts, list):
                     return posts
             except json.JSONDecodeError as e:
-                print(f"[BoardSim] JSON解析失敗: {e}. 先頭: {json_str[:200]}")
+                print(f"[BoardSim] JSON parse failed: {e}. First chars: {json_str[:200]}")
 
         return []
 
     # ------------------------------------------------------------------
-    # ユーティリティ
+    # Utilities
     # ------------------------------------------------------------------
 
     @staticmethod
     def _anon_id(agent_name: str) -> str:
-        """エージェント名 → 5ch風匿名ID（8文字英数字）"""
+        """Agent name -> 4chan-style anonymous ID (8 char alphanumeric)"""
         import hashlib
-        h = int(hashlib.md5((agent_name + "oracle_salt").encode()).hexdigest(), 16)
-        return format(h % (36 ** 8), "08x")  # 例: 01hmgtde
+        h = int(hashlib.md5((agent_name + "41chan_salt").encode()).hexdigest(), 16)
+        return format(h % (36 ** 8), "08x")  # e.g. 01hmgtde
 
     def _get_recent_posts(self, n: int) -> str:
-        """直近n件の発言を文字列化（5ch形式）— LLMへ渡すため本名を出さない"""
+        """Format last n posts as string (4chan format) — use anon IDs, not real names"""
         recent = self.posts[-n:] if len(self.posts) >= n else self.posts
         lines = []
         for p in recent:
@@ -809,7 +877,7 @@ class BoardSimulator:
         return "\n".join(lines)
 
     def _format_thread(self) -> str:
-        """掲示板ログを5ch形式で整形— LLMへ渡すため本名を出さない"""
+        """Format board log in 4chan style — use anon IDs, not real names"""
         lines = [
             BOARD_HEADER_TEMPLATE.format(
                 board_name=self.board_name,
@@ -825,5 +893,5 @@ class BoardSimulator:
                 f"\n{p['num']}: {p['username']} {p['timestamp']} ID:{anon}"
                 f"{anchor_str}\n  {p['content']}"
             )
-        lines.append(f"\n\n--- 総レス数: {self.post_counter} ---")
+        lines.append(f"\n\n--- Total replies: {self.post_counter} ---")
         return "\n".join(lines)

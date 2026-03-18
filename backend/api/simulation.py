@@ -311,8 +311,8 @@ async def get_jikkyo(sim_id: str):
 
 @router.get("/agents/persistent")
 async def list_persistent_agents():
-    """ストック済みエージェント一覧"""
-    agents = get_persistent_agents(limit=200)
+    """ストック済みエージェント一覧（プライベートエージェントは除外）"""
+    agents = [a for a in get_persistent_agents(limit=200) if not a.get("is_private", 0)]
     result = []
     for a in agents:
         topics = a.get("interested_topics", "[]")

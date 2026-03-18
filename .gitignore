@@ -12,7 +12,11 @@ __pycache__/
 *.db-wal
 memory_*.db
 
-# 実在スタッフ情報（非公開）
+# Private real agent data
 backend/agents/stock_agents_real.json
 backend/agents/stock_agents_real_batch*.json
 backend/agents/stock_agents_backup_*.json
+backend/agents/private/
+
+# Backups (private)
+backup/

@@ -223,6 +223,7 @@ def init_db():
             ("debate_tactics", "TEXT DEFAULT ''"),
             ("social_position", "TEXT DEFAULT ''"),
             ("is_active", "INTEGER DEFAULT 1"),
+            ("is_private", "INTEGER DEFAULT 0"),
         ]
         for col_name, col_def in new_columns:
             try:
@@ -416,17 +417,20 @@ def save_persistent_agent(agent) -> None:
         )
 
 
-def get_persistent_agents(limit: int = 20, include_bad: bool = True) -> List[Dict]:
-    """永続エージェントを取得（使用回数が少ない順 + ランダム）"""
+def get_persistent_agents(limit: int = 20, include_bad: bool = True, include_private: bool = False) -> List[Dict]:
+    """永続エージェントを取得（使用回数が少ない順 + ランダム）
+    include_private=False（デフォルト）でプライベートエージェントを除外する。
+    """
     with db_conn() as conn:
+        private_clause = "" if include_private else "AND COALESCE(is_private, 0) = 0"
         if include_bad:
             rows = conn.execute(
-                "SELECT * FROM persistent_agents ORDER BY use_count ASC, RANDOM() LIMIT ?",
+                f"SELECT * FROM persistent_agents WHERE 1=1 {private_clause} ORDER BY use_count ASC, RANDOM() LIMIT ?",
                 (limit,),
             ).fetchall()
         else:
             rows = conn.execute(
-                "SELECT * FROM persistent_agents WHERE rating != 'bad' ORDER BY use_count ASC, RANDOM() LIMIT ?",
+                f"SELECT * FROM persistent_agents WHERE rating != 'bad' {private_clause} ORDER BY use_count ASC, RANDOM() LIMIT ?",
                 (limit,),
             ).fetchall()
         return [dict(r) for r in rows]
