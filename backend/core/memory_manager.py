@@ -56,8 +56,8 @@ class MemoryManager:
     # 長期記憶用 ChromaDB PersistentClient（プロセス内で1インスタンス共有）
     _longterm_client = None
     _longterm_lock = threading.Lock()
-    _LONGTERM_DB_DIR = "/Users/takashihasumura/oracle-channel/backend/db/chroma_longterm"
-    _AGENT_MEMORIES_DIR = "/Users/takashihasumura/oracle-channel/backend/data/agent_memories"
+    _LONGTERM_DB_DIR = "/Users/takashihasumura/41chan/backend/db/chroma_longterm"
+    _AGENT_MEMORIES_DIR = "/Users/takashihasumura/41chan/backend/data/agent_memories"
 
     @classmethod
     def _get_longterm_client(cls):

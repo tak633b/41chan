@@ -5,11 +5,15 @@ POST /api/seed/apply — SeedDataをシミュレーションに適用
 """
 
 import json
+import re
+import asyncio
+import httpx
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional, List
 
-from core.seed_extractor import extract_from_url, extract_from_text, SeedData
+from core.seed_extractor import extract_from_text, SeedData
+from core.llm_client import OracleLLMClient
 from db.database import get_simulation, update_simulation, db_conn
 
 router = APIRouter()
@@ -33,6 +37,23 @@ class SeedApplyRequest(BaseModel):
     seed_data: SeedDataResponse
 
 
+async def _async_fetch_url(url: str) -> str:
+    """httpxで非同期URLフェッチ"""
+    headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"}
+    async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
+        resp = await client.get(url, headers=headers)
+        resp.raise_for_status()
+        html = resp.text
+        import re as _re
+        text = _re.sub(r"<script[^>]*>[\s\S]*?</script>", "", html, flags=_re.IGNORECASE)
+        text = _re.sub(r"<style[^>]*>[\s\S]*?</style>", "", text, flags=_re.IGNORECASE)
+        text = _re.sub(r"<[^>]+>", " ", text)
+        text = _re.sub(r"\s+", " ", text).strip()
+        title_match = _re.search(r"<title[^>]*>(.*?)</title>", html, _re.IGNORECASE | _re.DOTALL)
+        title = title_match.group(1).strip() if title_match else ""
+        return f"タイトル: {title}\n\n{text[:5000]}"
+
+
 @router.post("/seed/extract", response_model=SeedDataResponse)
 async def extract_seed(req: SeedExtractRequest):
     """URLまたはテキストからシード情報を抽出"""
@@ -40,12 +61,18 @@ async def extract_seed(req: SeedExtractRequest):
         raise HTTPException(status_code=400, detail="urlまたはtextのいずれかを指定してください")
 
     try:
-        import asyncio
-        loop = asyncio.get_event_loop()
         if req.url:
-            seed = await loop.run_in_executor(None, lambda: extract_from_url(req.url))
+            article_text = await _async_fetch_url(req.url)
         else:
-            seed = await loop.run_in_executor(None, lambda: extract_from_text(req.text))
+            article_text = req.text
+
+        # Extract用はOllamaを使用（ZAIのレート制限を回避）
+        ollama_llm = OracleLLMClient(backend="ollama")
+        loop = asyncio.get_event_loop()
+        seed = await asyncio.wait_for(
+            loop.run_in_executor(None, lambda: extract_from_text(article_text, llm=ollama_llm)),
+            timeout=60.0
+        )
 
         return SeedDataResponse(
             theme=seed.theme,
@@ -54,6 +81,10 @@ async def extract_seed(req: SeedExtractRequest):
             tone=seed.tone,
             background_context=seed.background_context,
         )
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=500, detail="タイムアウト: 処理に時間がかかりすぎました。別のURLを試すか、テキストを直接入力してください。")
+    except httpx.HTTPError as e:
+        raise HTTPException(status_code=500, detail=f"URL取得失敗: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"抽出失敗: {str(e)}")
 

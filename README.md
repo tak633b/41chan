@@ -17,7 +17,7 @@
 
 - 🧠 **Auto-generated from seed text** — Just enter a topic; AI extracts characters, assigns roles, and generates boards
 - 🎭 **Rich personas** — Agents with MBTI, age, profession, tone style (authority/worker/youth/outsider/lurker) and unique speech patterns
-- 📋 **Authentic 4chan-style UI** — Thread titles, anchor replies (`>>1`), tripcodes, ASCII art… as close to the real thing as possible
+- 📋 **Authentic 4chan-style UI** — Yotsuba B theme, greentext, tripcodes, anchor replies (`>>1`), catalog view, file info display… faithful to the real thing
 - ⚡ **Live streaming** — Debate flows in real-time via Server-Sent Events
 - 📊 **Auto report generation** — After simulation: consensus score, turning points, minority views, and a parallel-world prediction report
 - 💬 **Ask agents** — Directly question agents after simulation to dig deeper
@@ -63,14 +63,14 @@ npm install
 ```bash
 # Backend (terminal 1)
 cd backend
-venv/bin/uvicorn main:app --reload --port 8000
+venv/bin/uvicorn main:app --reload --port 8001
 
 # Frontend (terminal 2)
 cd frontend
-npm run dev
+npm run dev -- --port 3002
 ```
 
-👉 Open **http://localhost:3000** in your browser
+👉 Open **http://localhost:3002** in your browser
 
 ---
 
@@ -167,6 +167,7 @@ graph TB
 │   │   │   ├── board/     # Board view
 │   │   │   ├── thread/    # Thread view
 │   │   │   ├── agents/    # Agent list
+│   │   │   ├── catalog/   # Catalog view (grid overview)
 │   │   │   ├── report/    # Report view
 │   │   │   └── ask/       # Q&A thread
 │   │   └── agents/        # Persistent agent management
@@ -228,6 +229,27 @@ See [docs/api.md](docs/api.md) for full details.
 ---
 
 ## 📋 Changelog
+
+### v0.5.0 (2026-03-19)
+
+**4chan Yotsuba B theme overhaul**
+- Full Yotsuba B color scheme: page bg `#eef2ff`, thread bg `#d6daf0`, header `#98e`
+- Greentext rendering: lines starting with `>` displayed in `#789922`
+- PostCard header reformatted to 4chan layout: `Name MM/DD/YY(Day)HH:MM:SS ID:xxx No.N`
+- Dummy file info display on OP posts (atmospheric)
+- Subject (thread title) displayed on first post only, bold `#cc1105`
+- Anchor link color `#d00`, dark popup theme
+
+**New: Catalog view** (`/sim/[id]/catalog`)
+- Grid layout (150px cards, auto-fill responsive)
+- Thread title, snippet, reply count per card
+- Navigation: [Return] [Top] links
+
+**Infrastructure**
+- LaunchAgent plist for auto-start (macOS)
+- `requirements.txt` updated with `requests`, `certifi`, `httpx`
+- Seed extraction now uses Ollama backend (avoids ZAI rate limits)
+- Frontend submodule reference fixed (now tracked as regular directory)
 
 ### v0.4.0 (2026-03-18)
 

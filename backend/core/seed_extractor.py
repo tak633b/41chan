@@ -39,7 +39,8 @@ def fetch_article_text(url: str) -> str:
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
     }
     try:
-        resp = requests.get(url, headers=headers, timeout=15)
+        import certifi
+        resp = requests.get(url, headers=headers, timeout=(5, 10), verify=certifi.where())
         resp.raise_for_status()
         html = resp.text
 
@@ -55,7 +56,8 @@ def fetch_article_text(url: str) -> str:
 
         return f"タイトル: {title}\n\n{text[:5000]}"
     except Exception as e:
-        raise ValueError(f"URL取得失敗: {e}")
+        # フェッチ失敗時はURLそのものをコンテキストとして返す（LLMが推測）
+        return f"URL: {url}\n\n(記事の直接取得に失敗しました。URLのドメイン・パスからテーマを推測してください: {e})"
 
 
 def extract_seed_from_text(text: str, llm: Optional[OracleLLMClient] = None) -> SeedData:
