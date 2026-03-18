@@ -17,7 +17,7 @@ from typing import List
 from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
 
-from db.database import db_conn, get_boards, get_report, get_simulation, update_simulation, get_persistent_agents
+from db.database import db_conn, get_boards, get_report, get_simulation, update_simulation, get_persistent_agents, get_system_events
 from models.schemas import AgentDetail, AgentInfo, SimulationStatus, SimulationSummary
 from services.simulation_runner import _emit, run_simulation
 
@@ -167,6 +167,12 @@ async def delete_simulation(sim_id: str):
     if not sim:
         raise HTTPException(status_code=404, detail="Simulation not found")
     with db_conn() as conn:
+        # FK参照を持つテーブルを先に削除（system_events → simulations）
+        conn.execute("DELETE FROM system_events WHERE simulation_id=?", (sim_id,))
+        # sim_id で参照するテーブル
+        conn.execute("DELETE FROM agent_chat_history WHERE sim_id=?", (sim_id,))
+        conn.execute("DELETE FROM agent_relationships WHERE sim_id=?", (sim_id,))
+        # 通常テーブル
         conn.execute("DELETE FROM posts WHERE simulation_id=?", (sim_id,))
         conn.execute("DELETE FROM threads WHERE simulation_id=?", (sim_id,))
         conn.execute("DELETE FROM boards WHERE simulation_id=?", (sim_id,))
@@ -291,6 +297,14 @@ async def get_agent_detail(sim_id: str, agent_id: str):
             for p in recent_posts
         ],
     }
+
+
+
+@router.get("/simulation/{sim_id}/jikkyo")
+async def get_jikkyo(sim_id: str):
+    """実況ログ（ページ復帰時復元用）を返す"""
+    events = get_system_events(sim_id)
+    return {"events": events}
 
 
 # ===== 永続エージェント管理 API =====

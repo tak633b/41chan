@@ -312,10 +312,10 @@ class BoardSimulator:
         content: str,
         round_num: int,
         post_index: int,
-        max_retry: int = 3,
+        max_retry: int = 1,
         extra_candidates: Optional[List[str]] = None,
     ) -> str:
-        """過去投稿・今シミュ内投稿（他エージェント含む）と類似していたら再生成（最大max_retry回）"""
+        """過去投稿・今シミュ内投稿（他エージェント含む）と類似していたら再生成（最大1回）"""
         past_db = self._get_past_posts(agent.name)
         past_cur = self._get_current_sim_own_posts(agent.name)
         # 同一スレッド内の直近5投稿（他エージェント含む）もチェック対象に
@@ -329,7 +329,7 @@ class BoardSimulator:
 
         for attempt in range(max_retry):
             score = _similarity_score(content, all_past)
-            if score < 0.35:
+            if score < 0.45:
                 break
             # 類似している実際の投稿を最大2件フィードバックとして渡す
             similar_examples = sorted(
@@ -355,29 +355,12 @@ class BoardSimulator:
     # ------------------------------------------------------------------
 
     def _generate_thread_opener(self):
-        """>>1 スレ立て投稿を生成してself.postsに追加する"""
-        prompt = f"""あなたは5chの掲示板でスレを立てた人物です。
-スレタイと議題の概要を>>1として書いてください。
-
-【板名】{self.board_name}
-【スレタイ】{self.thread_title}
-【テーマ】{self.theme}
-【議題/質問】{self.question}
-
-━━━━ 絶対ルール ━━━━
-■ 敬語禁止。タメ口・ぞんざいな口調のみ。
-■ 3〜6行程度。長すぎない。
-■ スレタイの背景・問題意識・議論してほしい内容を簡潔に書く。
-■ 最後に「以下、議論どうぞ」「ではどうぞ」など一言添える。
-■ 「1 ：」「>>1」などの番号は書かない（システムが付与する）。
-■ JSON等の形式は不要。本文テキストのみ出力。
-"""
-        try:
-            result = self.llm.chat(prompt)
-            content = result.strip()
-        except Exception as e:
-            print(f"[BoardSim] スレ立て生成失敗: {e}")
-            content = f"【{self.thread_title}】\nテーマ: {self.theme}\n議題: {self.question}\n以下、議論どうぞ。"
+        """>>1 スレ立て投稿をテンプレートで生成（LLMコール不要）"""
+        content = (
+            f"【{self.thread_title}】\n"
+            f"テーマ: {self.theme}\n\n"
+            f"おまいら語れ"
+        )
 
         post_time = self.base_time
         username = f"名無しさん＠{self.board_name}"
@@ -405,7 +388,11 @@ class BoardSimulator:
         print(f"\n[BoardSim] 開始: {self.num_rounds}ラウンド, {len(self.agents)}エージェント")
         print(f"[BoardSim] 板: {self.board_name} | スレ: {self.thread_title}\n")
 
-        # >>1: スレ立て投稿（テーマ概要を必ず書く）
+        # 過去投稿をバッチプリフェッチ（全エージェント分を一括取得）
+        for agent in self.agents:
+            self._get_past_posts(agent.name)
+
+        # >>1: スレ立て投稿（テンプレート生成）
         self._generate_thread_opener()
 
         for round_num in range(self.num_rounds):
@@ -478,8 +465,11 @@ class BoardSimulator:
 
         return sequence[:target_count]
 
+    # バッチサイズ定数（1回のLLMコールで生成する投稿数）
+    BATCH_SIZE = 4
+
     def _process_batch(self, round_num: int):
-        """スタイル別頻度重み付きで投稿順を決定し、1エージェントずつ個別生成"""
+        """スタイル別頻度重み付きで投稿順を決定し、バッチ生成（BATCH_SIZE件ずつ）"""
         if self.scale == "mini":
             post_count_target = random.randint(6, 8)
         else:
@@ -489,72 +479,83 @@ class BoardSimulator:
 
         i = 0
         while i < len(posting_agents):
-            agent = posting_agents[i]
-            post_data = self._generate_single_post(agent, round_num, i)
+            # BATCH_SIZE件ずつバッチ生成
+            batch_end = min(i + self.BATCH_SIZE, len(posting_agents))
+            batch_agents = posting_agents[i:batch_end]
 
-            if post_data is None:
-                i += 1
-                continue
+            batch_results = self._generate_batch_posts(batch_agents, round_num, i)
 
-            content = post_data.get("content", "").strip()
-            # LLMが冒頭に >>N を出力することがある（anchor_to と二重になる）→ 除去
-            content = re.sub(r'^>>\d+\s*', '', content).strip()
-            if not content:
-                i += 1
-                continue
+            for j, post_data in enumerate(batch_results):
+                if post_data is None:
+                    continue
 
-            self.post_counter += 1
-            self.time_offset += random.randint(2, 15)
-            post_time = self.base_time + timedelta(minutes=self.time_offset)
+                agent_name = post_data.get("agent_name", "")
+                # バッチ結果からエージェントを特定
+                agent = None
+                for a in batch_agents:
+                    if a.name == agent_name:
+                        agent = a
+                        break
+                if agent is None and j < len(batch_agents):
+                    agent = batch_agents[j]
 
-            username = f"名無しさん＠{self.board_name}"
+                content = post_data.get("content", "").strip()
+                # LLMが冒頭に >>N を出力することがある（anchor_to と二重になる）→ 除去
+                content = re.sub(r'^>>\d+\s*', '', content).strip()
+                if not content:
+                    continue
 
-            anchor_to = post_data.get("anchor_to")
-            if anchor_to is not None:
-                try:
-                    anchor_to = int(anchor_to)
-                    if anchor_to < 1 or anchor_to > self.post_counter - 1:
+                self.post_counter += 1
+                self.time_offset += random.randint(2, 15)
+                post_time = self.base_time + timedelta(minutes=self.time_offset)
+
+                username = f"名無しさん＠{self.board_name}"
+
+                anchor_to = post_data.get("anchor_to")
+                if anchor_to is not None:
+                    try:
+                        anchor_to = int(anchor_to)
+                        if anchor_to < 1 or anchor_to > self.post_counter - 1:
+                            anchor_to = None
+                    except (ValueError, TypeError):
                         anchor_to = None
-                except (ValueError, TypeError):
-                    anchor_to = None
 
-            emotion = post_data.get("emotion", "neutral")
-            p_style = getattr(agent, "posting_style", "emotional")
+                emotion = post_data.get("emotion", "neutral")
 
-            post = {
-                "num": self.post_counter,
-                "agent_name": agent.name,
-                "username": username,
-                "round_num": round_num,
-                "timestamp": post_time.strftime("%Y/%m/%d %H:%M"),
-                "action_type": "post",
-                "anchor_to": anchor_to,
-                "content": content,
-                "emotion": emotion,
-            }
-            self.posts.append(post)
+                post = {
+                    "num": self.post_counter,
+                    "agent_name": agent.name if agent else agent_name,
+                    "username": username,
+                    "round_num": round_num,
+                    "timestamp": post_time.strftime("%Y/%m/%d %H:%M"),
+                    "action_type": "post",
+                    "anchor_to": anchor_to,
+                    "content": content,
+                    "emotion": emotion,
+                }
+                self.posts.append(post)
 
-            # リアルタイムコールバック（定義されていれば呼ぶ）
-            if self.on_post_generated:
-                self.on_post_generated(post)
+                # リアルタイムコールバック（定義されていれば呼ぶ）
+                if self.on_post_generated:
+                    self.on_post_generated(post)
 
-            self.memory.store(
-                agent_id=agent.name,
-                round_num=round_num,
-                event_type="post",
-                content=f"Round {round_num+1}: [{self.thread_title}] {content[:120]}",
-                importance=0.7,
-                related_agents=[a.name for a in self.agents if a.name != agent.name],
-            )
+                self.memory.store(
+                    agent_id=agent.name if agent else agent_name,
+                    round_num=round_num,
+                    event_type="post",
+                    content=f"Round {round_num+1}: [{self.thread_title}] {content[:120]}",
+                    importance=0.7,
+                    related_agents=[a.name for a in self.agents if (a.name != (agent.name if agent else agent_name))],
+                )
 
-            p_style = getattr(agent, "posting_style", "emotional")
-            style_label = POSTING_STYLES.get(p_style, {}).get("label", p_style)
-            print(f"  [{agent.name}/{style_label}] {content[:60]}...")
+                p_style = getattr(agent, "posting_style", "emotional") if agent else "emotional"
+                style_label = POSTING_STYLES.get(p_style, {}).get("label", p_style)
+                print(f"  [{agent.name if agent else agent_name}/{style_label}] {content[:60]}...")
 
-            i += 1
+            i = batch_end
 
     def _generate_batch_posts(self, agents_batch: List[OracleAgent], round_num: int, start_index: int) -> List[Dict[str, Any]]:
-        """2-3人分の投稿を1回のLLM呼び出しで生成"""
+        """BATCH_SIZE人分の投稿を1回のLLM呼び出しで生成（各投稿は異なる内容）"""
         recent_posts = self._get_recent_posts(8)
 
         agent_specs = []
@@ -627,7 +628,6 @@ class BoardSimulator:
         batch_prompt = f"""{intro_line}
 
 板: {self.board_name} | 議題: {self.question}
-
 【スレの流れ】
 {recent_posts if recent_posts else "（まだ発言なし）"}
 
@@ -640,6 +640,7 @@ class BoardSimulator:
 - 前の投稿と同じフレーズの繰り返し禁止。全員違う内容を書け。
 - 投稿内容に人名・固有名詞を書くな。匿名掲示板なので名前で呼ぶのは禁止。
 - 冒頭フレーズを前回と絶対に変えること。同じ書き出しの繰り返し厳禁。毎回全く別の切り口から始めることを意識しろ。同じパターンの反論文1語目を変えただけの繰り返し厳禁。
+- ★重要: 各投稿は必ず異なる内容・視点・切り口にせよ。同じ話題を繰り返すな。
 
 {extra_hint}JSON配列で返せ（nameは住人IDのみ、contentに名前を含めるな）:
 [{{"name":"住人ID（上記一覧から）","content":"投稿内容（名前を含めるな）","anchor_to":番号またはnull,"emotion":"neutral/excited/angry/amused/dismissive"}}]"""

@@ -141,12 +141,23 @@ CREATE TABLE IF NOT EXISTS ask_history (
     FOREIGN KEY (simulation_id) REFERENCES simulations(id)
 );
 
+CREATE TABLE IF NOT EXISTS system_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    simulation_id TEXT NOT NULL,
+    event_type TEXT NOT NULL,
+    lines TEXT NOT NULL DEFAULT '[]',
+    seq INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (simulation_id) REFERENCES simulations(id)
+);
+
 CREATE INDEX IF NOT EXISTS idx_boards_sim ON boards(simulation_id);
 CREATE INDEX IF NOT EXISTS idx_threads_board ON threads(board_id);
 CREATE INDEX IF NOT EXISTS idx_threads_sim ON threads(simulation_id);
 CREATE INDEX IF NOT EXISTS idx_posts_thread ON posts(thread_id);
 CREATE INDEX IF NOT EXISTS idx_posts_sim ON posts(simulation_id);
 CREATE INDEX IF NOT EXISTS idx_agents_sim ON agents(simulation_id);
+CREATE INDEX IF NOT EXISTS idx_sysev_sim ON system_events(simulation_id);
 """
 
 
@@ -173,11 +184,38 @@ def db_conn():
         conn.close()
 
 
+MIROFISH_SCHEMA_SQL = """
+CREATE TABLE IF NOT EXISTS agent_chat_history (
+    id TEXT PRIMARY KEY,
+    sim_id TEXT NOT NULL,
+    agent_id TEXT NOT NULL,
+    role TEXT NOT NULL,
+    content TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS agent_relationships (
+    id TEXT PRIMARY KEY,
+    sim_id TEXT NOT NULL,
+    from_agent_id TEXT NOT NULL,
+    to_agent_id TEXT NOT NULL,
+    relation_type TEXT NOT NULL,
+    strength REAL DEFAULT 1.0,
+    evidence TEXT,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_agent_chat_sim ON agent_chat_history(sim_id);
+CREATE INDEX IF NOT EXISTS idx_agent_rel_sim ON agent_relationships(sim_id);
+"""
+
+
 def init_db():
     """DBスキーマを初期化"""
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     with db_conn() as conn:
         conn.executescript(SCHEMA_SQL)
+        conn.executescript(MIROFISH_SCHEMA_SQL)
         new_columns = [
             ("emotional_wound", "TEXT DEFAULT ''"),
             ("information_bias", "TEXT DEFAULT ''"),
@@ -204,6 +242,11 @@ def init_db():
                 conn.execute(f"ALTER TABLE agents ADD COLUMN {col_name} {col_def}")
             except Exception:
                 pass
+        # simulations テーブルに seed_data カラム追加
+        try:
+            conn.execute("ALTER TABLE simulations ADD COLUMN seed_data TEXT DEFAULT ''")
+        except Exception:
+            pass
     print(f"[DB] 初期化完了: {DB_PATH}")
 
 
@@ -397,3 +440,84 @@ def increment_agent_use_count(agent_names: List[str]):
                 "UPDATE persistent_agents SET use_count = use_count + 1 WHERE name=?",
                 (name,),
             )
+
+
+def add_system_event(simulation_id: str, event_type: str, lines: List[str], seq: int = 0):
+    """実況システムイベントをDBに保存"""
+    with db_conn() as conn:
+        conn.execute(
+            "INSERT INTO system_events (simulation_id, event_type, lines, seq, created_at) VALUES (?,?,?,?,?)",
+            (simulation_id, event_type, json.dumps(lines, ensure_ascii=False), seq, datetime.now().isoformat()),
+        )
+
+
+def get_agent_chat_history(sim_id: str, agent_id: str) -> List[Dict]:
+    """エージェントチャット履歴を取得"""
+    with db_conn() as conn:
+        rows = conn.execute(
+            "SELECT * FROM agent_chat_history WHERE sim_id=? AND agent_id=? ORDER BY created_at ASC",
+            (sim_id, agent_id),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def add_agent_chat_message(sim_id: str, agent_id: str, role: str, content: str) -> str:
+    """エージェントチャットメッセージを追加"""
+    msg_id = str(uuid.uuid4())
+    with db_conn() as conn:
+        conn.execute(
+            "INSERT INTO agent_chat_history (id, sim_id, agent_id, role, content) VALUES (?,?,?,?,?)",
+            (msg_id, sim_id, agent_id, role, content),
+        )
+    return msg_id
+
+
+def get_agent_relationships(sim_id: str) -> List[Dict]:
+    """エージェント関係グラフを取得"""
+    with db_conn() as conn:
+        rows = conn.execute(
+            "SELECT * FROM agent_relationships WHERE sim_id=? ORDER BY updated_at ASC",
+            (sim_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def upsert_agent_relationship(sim_id: str, from_id: str, to_id: str, relation_type: str, strength: float = 1.0, evidence: str = ""):
+    """エージェント関係を追加/更新"""
+    rel_id = str(uuid.uuid4())
+    with db_conn() as conn:
+        # 既存チェック
+        existing = conn.execute(
+            "SELECT id, strength FROM agent_relationships WHERE sim_id=? AND from_agent_id=? AND to_agent_id=? AND relation_type=?",
+            (sim_id, from_id, to_id, relation_type),
+        ).fetchone()
+        if existing:
+            new_strength = min(5.0, existing["strength"] + strength * 0.5)
+            conn.execute(
+                "UPDATE agent_relationships SET strength=?, evidence=?, updated_at=? WHERE id=?",
+                (new_strength, evidence, datetime.now().isoformat(), existing["id"]),
+            )
+        else:
+            conn.execute(
+                "INSERT INTO agent_relationships (id, sim_id, from_agent_id, to_agent_id, relation_type, strength, evidence) VALUES (?,?,?,?,?,?,?)",
+                (rel_id, sim_id, from_id, to_id, relation_type, strength, evidence),
+            )
+
+
+def get_system_events(simulation_id: str) -> List[Dict]:
+    """シミュレーションの実況システムイベント一覧を返す"""
+    with db_conn() as conn:
+        rows = conn.execute(
+            "SELECT id, event_type, lines, seq, created_at FROM system_events WHERE simulation_id=? ORDER BY id ASC",
+            (simulation_id,),
+        ).fetchall()
+        result = []
+        for r in rows:
+            result.append({
+                "id": r["id"],
+                "event_type": r["event_type"],
+                "lines": json.loads(r["lines"]),
+                "seq": r["seq"],
+                "created_at": r["created_at"],
+            })
+        return result

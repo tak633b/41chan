@@ -103,6 +103,61 @@ def _calc_activity_by_round(project_id: str) -> List[int]:
         return []
 
 
+def _select_representative_posts(thread_log: str, max_posts: int = 50) -> str:
+    """代表投稿を選定（emotion!=neutralを優先、次にanchor_toあり、残りで補充）"""
+    lines = thread_log.strip().split("\n")
+
+    # 投稿ブロックをパース（簡易: 番号で始まる行を投稿開始とみなす）
+    posts = []
+    current_post = []
+    for line in lines:
+        # "数字: " で始まる行は新しい投稿の開始
+        stripped = line.strip()
+        if stripped and len(stripped) > 2 and stripped[0].isdigit() and ": " in stripped[:10]:
+            if current_post:
+                posts.append("\n".join(current_post))
+            current_post = [line]
+        elif stripped.startswith("━━━━"):
+            if current_post:
+                posts.append("\n".join(current_post))
+                current_post = []
+            posts.append(line)  # ヘッダー行はそのまま保持
+        else:
+            current_post.append(line)
+    if current_post:
+        posts.append("\n".join(current_post))
+
+    if len(posts) <= max_posts:
+        return thread_log
+
+    # 分類: ヘッダー行、感情的投稿、アンカー付き投稿、通常投稿
+    headers = []
+    emotional = []
+    anchored = []
+    normal = []
+    for post in posts:
+        if post.strip().startswith("━━━━") or not any(c.isdigit() for c in post[:5]):
+            headers.append(post)
+        elif any(em in post for em in ["excited", "angry", "thoughtful", "dismissive", "amused"]):
+            emotional.append(post)
+        elif ">>" in post:
+            anchored.append(post)
+        else:
+            normal.append(post)
+
+    # 選定: headers + emotional優先 + anchored + normalで50件に
+    selected = headers[:]
+    remaining = max_posts - len(selected)
+    for pool in [emotional, anchored, normal]:
+        if remaining <= 0:
+            break
+        take = min(len(pool), remaining)
+        selected.extend(pool[:take])
+        remaining -= take
+
+    return "\n".join(selected)
+
+
 def generate_report(
     project_id: str,
     thread_log: str,
@@ -114,18 +169,23 @@ def generate_report(
     time_horizon: str = "3ヶ月",
 ) -> Dict[str, Any]:
     """2段階でレポート生成"""
-    # 並列スレッド処理直後にOllamaが高負荷な場合があるため冷却待機
-    if cooldown_sec > 0:
+    # ZAIバックエンド使用時は冷却不要（Ollamaのみ必要）
+    effective_cooldown = 0.0 if llm.backend == "zai" else cooldown_sec
+    if effective_cooldown > 0:
         import time as _t
-        print(f"[Reporter] Ollama冷却待機 {cooldown_sec:.0f}秒...", flush=True)
-        _t.sleep(cooldown_sec)
+        print(f"[Reporter] Ollama冷却待機 {effective_cooldown:.0f}秒...", flush=True)
+        _t.sleep(effective_cooldown)
+
+    # 代表投稿（最大50件）を選定してコンテキストサイズを削減
+    thread_log_selected = _select_representative_posts(thread_log, max_posts=50)
+
     # ログ要約
     max_log_chars = 6000
-    if len(thread_log) > max_log_chars:
+    if len(thread_log_selected) > max_log_chars:
         half = max_log_chars // 2
-        thread_log_excerpt = thread_log[:half] + "\n\n... [中略] ...\n\n" + thread_log[-half:]
+        thread_log_excerpt = thread_log_selected[:half] + "\n\n... [中略] ...\n\n" + thread_log_selected[-half:]
     else:
-        thread_log_excerpt = thread_log
+        thread_log_excerpt = thread_log_selected
 
     agent_list = ", ".join([f"{a.name}({a.tone_style})" for a in agents])
 

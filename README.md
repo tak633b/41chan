@@ -21,6 +21,8 @@
 - ⚡ **ライブストリーミング** — Server-Sent Events でリアルタイムに議論が流れる
 - 📊 **自動レポート生成** — シミュレーション後に合意スコア・転換点・少数意見・並行世界予測レポートを自動生成
 - 💬 **エージェントへの質問** — シミュレーション後にエージェントに直接質問して深掘りできる
+- 🔗 **関係グラフ可視化** — エージェント間の影響・対立・共感をグラフで可視化（vis-network / Force Atlas 2）
+- 🌱 **シード入力** — フリーテキストや既存ドキュメントからエージェントと議題を自動抽出
 - 🔄 **LLM自由切替** — ZAI GLM-5（クラウド）・Ollama（ローカル）・OpenRouterを設定1行で切替
 - 💾 **エージェント永続化** — お気に入りのエージェントを保存・再利用・評価できる
 
@@ -178,15 +180,20 @@ graph TB
 │   │   ├── board.py       # 板・スレッド
 │   │   ├── stream.py      # SSEストリーミング
 │   │   ├── report.py      # レポート
-│   │   └── ask.py         # Q&A機能
+│   │   ├── ask.py         # Q&A機能
+│   │   ├── agent_chat.py  # エージェントチャット
+│   │   ├── graph.py       # 関係グラフAPI
+│   │   └── seed.py        # シード入力API
 │   ├── core/              # コアモジュール
-│   │   ├── llm_client.py  # 統合LLMクライアント
+│   │   ├── llm_client.py  # 統合LLMクライアント（ZAI 2スロット方式）
 │   │   ├── entity_extractor.py
 │   │   ├── profile_generator.py
 │   │   ├── board_simulator.py
 │   │   ├── reporter.py
 │   │   ├── parameter_planner.py
-│   │   └── memory_manager.py
+│   │   ├── memory_manager.py
+│   │   ├── relationship_tracker.py  # GraphRAG: エージェント関係追跡
+│   │   └── seed_extractor.py        # シードテキスト→パラメータ抽出
 │   ├── services/          # ビジネスロジック
 │   ├── models/            # Pydanticスキーマ
 │   ├── agents/            # ストックエージェントデータ (JSON)
@@ -214,6 +221,51 @@ graph TB
 | `GET` | `/api/simulation/{id}/report` | レポート取得 |
 | `POST` | `/api/simulation/{id}/ask` | エージェントへ質問（SSE） |
 | `GET` | `/api/simulation/{id}/ask/history` | 質問履歴 |
+| `GET` | `/api/simulation/{id}/graph` | 関係グラフ取得 |
+| `POST` | `/api/simulation/{id}/agent/{agentId}/chat` | エージェントとチャット |
+| `POST` | `/api/seed/extract` | シードテキストからパラメータ抽出 |
+
+---
+
+## 📋 変更履歴
+
+### v0.4.0 (2026-03-18)
+
+**パフォーマンス改善**
+- バッチ投稿生成復活（BATCH_SIZE=4）でフルスケール 45分 → 10〜15分に短縮
+- ZAI 2スロット方式（実効並列間隔 1.5秒）
+- 類似度チェック軽量化（threshold 0.35→0.45、max_retry 3→1）
+- レポート生成最適化（cooldown=0、代表投稿50件に圧縮）
+- テンプレートベーススレ立て（LLMコール削減）
+
+**新機能: GraphRAG**
+- エージェント間の関係グラフをリアルタイム追跡（`relationship_tracker.py`）
+- vis-network（Force Atlas 2）でグラフ可視化
+- スレ主を「最も影響力が高い」ランキングから自動除外
+- グラフ安定後に物理シミュレーション自動停止
+
+**新機能: シード入力**
+- フリーテキスト・ドキュメントからエージェント・議題・板構成を自動抽出
+
+**新機能: エージェントチャット**
+- シミュレーション進行中にエージェントへ直接質問・対話
+
+**ZAI (GLM-5) 安定化**
+- グローバル2スロット排他ロックで429を根本解消
+- リトライ上限 3→6回、待機上限 60→120秒
+
+### v0.3.0 (2026-03-17)
+
+- **OSS公開**: APIキーをgit履歴から完全削除（git-filter-repo）
+- ドキュメント整備: README英語版・CONTRIBUTING.md・アーキテクチャ・APIドキュメント
+- react-markdown + remark-gfmで`[>>N@板名]`引用リンク正常表示
+
+### v0.2.0 (2026-03-16)
+
+- ZAI GLM-5バックエンド正式対応
+- 真のリアルタイム投稿生成（LLM→1投稿→DB→emit）
+- 起動時中断シミュレーション自動再開
+- 30体ストックエージェント（構造化14セクションペルソナ）
 
 ---
 

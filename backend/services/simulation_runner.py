@@ -14,7 +14,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional
 
-from db.database import db_conn, get_simulation, update_simulation, save_persistent_agents, get_persistent_agents, increment_agent_use_count
+from db.database import db_conn, get_simulation, update_simulation, save_persistent_agents, get_persistent_agents, increment_agent_use_count, add_system_event
 from core.llm_client import OracleLLMClient
 from core.entity_extractor import extract_entities
 from core.profile_generator import generate_agents
@@ -47,6 +47,14 @@ async def _emit(sim_id: str, event_type: str, data: Dict[str, Any]):
     event = {"type": event_type, "data": data}
     for q in _sse_queues.get(sim_id, []):
         await q.put(event)
+    # jikkyo_post はDBに永続化（ページ復帰時に復元できるよう）
+    if event_type == "jikkyo_post":
+        lines = data.get("lines", [])
+        seq = data.get("num", 0)
+        try:
+            add_system_event(sim_id, event_type, lines, seq)
+        except Exception:
+            pass
 
 
 def _emit_sync(sim_id: str, event_type: str, data: Dict[str, Any]):
@@ -84,6 +92,17 @@ async def run_simulation(
     # auto スケール用のパラメータプランナー結果
     _plan: Optional[Dict[str, Any]] = None
 
+    # 実況ログのシーケンス番号（DBへの永続化用）
+    _jseq = [0]
+
+    def _save_jikkyo(lines: list):
+        """実況ログをDBに保存（ページ復帰時復元用）"""
+        _jseq[0] += 1
+        try:
+            add_system_event(sim_id, "jikkyo_post", lines, _jseq[0])
+        except Exception:
+            pass
+
     try:
         loop = asyncio.get_event_loop()
 
@@ -106,6 +125,8 @@ async def run_simulation(
             return
         update_simulation(sim_id, status="extracting", progress=0.05)
         await _emit(sim_id, "status_update", {"status": "extracting", "progress": 0.05, "prompt": prompt})
+        _save_jikkyo([f"シミュレーション開始するお", f"お題: 「{prompt[:60]}」"])
+        _save_jikkyo(["エンティティ抽出中... しばし待たれよ"])
 
         full_seed = f"{prompt}\n\n{seed_text}" if seed_text else prompt
         llm_extract = llm  # 全処理で同じモデル（qwen3.5:9b）
@@ -197,13 +218,18 @@ async def run_simulation(
                     ),
                 )
 
-        # エージェント生成をSSEに通知
-        for a in oracle_agents:
+        # エージェント生成をSSEに通知（+ 実況ログDB保存）
+        _save_jikkyo(["ﾜｸﾜｸ エージェント召喚中..."])
+        for i, a in enumerate(oracle_agents, 1):
             await _emit(sim_id, "new_agent", {
                 "name": a.name,
                 "role": a.tone_style,
                 "personality_snippet": a.persona[:60] if a.persona else "",
             })
+            _save_jikkyo([
+                f"キタ━━━(ﾟ∀ﾟ)━━━!! {i}人目",
+                f"「住人{str(i).zfill(2)}（{a.tone_style or '？'}）」",
+            ])
 
         update_simulation(
             sim_id,
@@ -258,11 +284,17 @@ async def run_simulation(
                         (thread_id, board_id, sim_id, title, 1, now),
                     )
                     thread_emit_queue.append((thread_id, board_id, title))
-        # commit 完了後に emit
+        # commit 完了後に emit（+ 実況ログDB保存）
+        if board_emit_queue:
+            _save_jikkyo(["板を立ててくるお"])
         for board_id, name, emoji, description in board_emit_queue:
             await _emit(sim_id, "board_created", {
                 "board_id": board_id, "name": name, "emoji": emoji, "description": description,
             })
+            _save_jikkyo([
+                f"📋 {name} キタ━(ﾟ∀ﾟ)━!",
+                *([ f"（{description[:30]}）"] if description else []),
+            ])
         for thread_id, board_id, title in thread_emit_queue:
             await _emit(sim_id, "thread_created", {
                 "thread_id": thread_id, "board_id": board_id, "title": title,
@@ -343,11 +375,26 @@ async def run_simulation(
 
                 # リアルタイム投稿コールバック（DB保存 + SSE emit）
                 post_counter_ref = [0]  # ミュータブルなカウンター
+                simulator_ref = [None]  # simulatorへの参照（_on_postから遅延参照）
 
                 def _on_post(p: dict):
                     post_counter_ref[0] += 1
                     post_num = post_counter_ref[0]
                     post_id = str(uuid.uuid4())
+
+                    # GraphRAG: 非同期で関係抽出（メインフローを遅らせない）
+                    try:
+                        from core.relationship_tracker import extract_relationships_async
+                        # simulator_ref[0]はsimulatorが設定された後に参照される
+                        sim_posts = simulator_ref[0].posts if simulator_ref[0] else []
+                        extract_relationships_async(
+                            sim_id=sim_id,
+                            post={**p, "num": post_num},
+                            all_posts=sim_posts,
+                            agents=oracle_agents,
+                        )
+                    except Exception:
+                        pass
                     ts = p.get("timestamp", datetime.now().strftime("%Y/%m/%d %H:%M"))
 
                     with db_conn() as conn:
@@ -376,16 +423,15 @@ async def run_simulation(
                             "UPDATE threads SET last_post_at=? WHERE id=?", (ts, thread_id)
                         )
 
-                    # 書き込み中プレースホルダー
+                    # 書き込み中プレースホルダー（delay_msはフロント側アニメーション制御用）
                     _emit_sync(sim_id, "post_thinking", {
                         "board_id": board_id,
                         "thread_id": thread_id,
                         "agent_name": p.get("agent_name", ""),
                         "username": p.get("username", "名無し"),
                         "post_num": post_num,
+                        "delay_ms": 300 + (hash(post_id) % 6) * 100,
                     })
-                    import time as _time
-                    _time.sleep(0.3 + (hash(post_id) % 6) * 0.1)
 
                     _emit_sync(sim_id, "new_post", {
                         "board_id": board_id, "thread_id": thread_id,
@@ -415,6 +461,7 @@ async def run_simulation(
                     on_post_generated=_on_post,
                 )
                 simulator.sim_id = sim_id  # 過去シミュ除外用
+                simulator_ref[0] = simulator  # GraphRAG用参照
 
                 try:
                     await loop.run_in_executor(None, simulator.run)
@@ -544,6 +591,12 @@ async def run_simulation(
             except Exception:
                 pass
 
+        _save_jikkyo([
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+            f"シミュレーション完了！ 総レス数: {total_posts_global}",
+            "レポートが生成されました。上のタブから確認できます",
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+        ])
         await _emit(sim_id, "sim_complete", {
             "report_ready": True,
             "total_posts": total_posts_global,

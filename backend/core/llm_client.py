@@ -16,16 +16,19 @@ from openai import OpenAI
 
 import threading
 
-# ZAI用グローバルロック（複数インスタンスが並列でZAIを叩くと429になるため直列化）
-_ZAI_LOCK = threading.Lock()
-_ZAI_LAST_CALL = 0.0
+# ZAI用タイムスロット並列化（2スロット交互発射で実効1.5秒間隔）
+_ZAI_SLOTS = [
+    {"lock": threading.Lock(), "last_call": 0.0},
+    {"lock": threading.Lock(), "last_call": 0.0},
+]
+_ZAI_SLOT_SELECTOR_LOCK = threading.Lock()  # スロット選択のアトミック性保証
 
 
 class OracleLLMClient:
     """LLMクライアント（ZAI / Ollama / OpenRouter 切替対応、リトライ付き）"""
 
     # ZAI設定
-    ZAI_API_KEY = "***REDACTED_ZAI***"
+    ZAI_API_KEY = os.environ.get("ORACLE_ZAI_API_KEY", "")
     ZAI_BASE_URL = "https://api.z.ai/api/coding/paas/v4"
     ZAI_MODEL = os.environ.get("ORACLE_ZAI_MODEL", "glm-5")
 
@@ -114,13 +117,15 @@ class OracleLLMClient:
             kwargs["extra_body"] = {"chat_template_kwargs": {"enable_thinking": False}}
 
         if self.backend == "zai":
-            # ZAIは並列リクエストで429になるためグローバルロックで直列化
-            with _ZAI_LOCK:
-                elapsed = time.time() - _ZAI_LAST_CALL
+            # ZAI 2スロット並列: last_callが古いスロットを選んで交互発射
+            with _ZAI_SLOT_SELECTOR_LOCK:
+                slot = min(_ZAI_SLOTS, key=lambda s: s["last_call"])
+            with slot["lock"]:
+                elapsed = time.time() - slot["last_call"]
                 if elapsed < self.MIN_CALL_INTERVAL:
                     time.sleep(self.MIN_CALL_INTERVAL - elapsed)
                 response = self.client.chat.completions.create(**kwargs)
-                _ZAI_LAST_CALL = time.time()
+                slot["last_call"] = time.time()
         else:
             response = self.client.chat.completions.create(**kwargs)
 
@@ -146,7 +151,7 @@ class OracleLLMClient:
             time.sleep(self._interval - elapsed)
 
         last_error = None
-        retries = min(max_retries, 3) if self.backend == "zai" else 3  # hung防止: 最大3回
+        retries = min(max_retries, 6) if self.backend == "zai" else 3  # ZAIは最大6回（429対策）
 
         for attempt in range(retries):
             try:
@@ -175,8 +180,13 @@ class OracleLLMClient:
 
                 if attempt < retries - 1:
                     if is_rate_limit:
-                        wait = (10 * (2 ** attempt)) + random.uniform(0, 3)
-                        wait = min(wait, 60)  # 最大60秒に制限
+                        wait = (5 * (2 ** attempt)) + random.uniform(0, 3)
+                        wait = min(wait, 120)  # 最大120秒に制限
+                        # 429時は全スロットをwait秒先に進めて冷却
+                        if self.backend == "zai":
+                            future = time.time() + wait
+                            for s in _ZAI_SLOTS:
+                                s["last_call"] = max(s["last_call"], future)
                         print(f"[OracleLLM] レート制限 (試行{attempt+1}/{retries})、{wait:.0f}秒待機...")
                     else:
                         wait = 3.0 + random.uniform(0, 2)

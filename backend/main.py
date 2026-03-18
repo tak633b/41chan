@@ -36,6 +36,9 @@ from api.board import router as board_router
 from api.stream import router as stream_router
 from api.report import router as report_router
 from api.ask import router as ask_router
+from api.seed import router as seed_router
+from api.agent_chat import router as agent_chat_router
+from api.graph import router as graph_router
 
 app = FastAPI(
     title="41ch API",
@@ -63,6 +66,9 @@ app.include_router(board_router, prefix="/api")
 app.include_router(stream_router, prefix="/api")
 app.include_router(report_router, prefix="/api")
 app.include_router(ask_router, prefix="/api")
+app.include_router(seed_router, prefix="/api")
+app.include_router(agent_chat_router, prefix="/api")
+app.include_router(graph_router, prefix="/api")
 
 
 @app.on_event("startup")
