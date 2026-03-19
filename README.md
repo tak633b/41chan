@@ -103,13 +103,19 @@ ollama serve
 
 ### ⚠️ ZAI (GLM-5) Notes
 
-**1. Use the `coding/paas/v4` endpoint**
+> **💡 Recommended: [GLM Coding Plan](https://z.ai)** — A flat-rate subscription (no per-token billing). Ideal for simulations that generate thousands of LLM calls. The Coding Plan uses a **different API endpoint** from the standard pay-per-token plan, so make sure to set it correctly.
+
+**1. Coding Plan uses the `coding/paas/v4` endpoint**
 
 ```
+# ✅ Coding Plan (flat-rate) — use this
 https://api.z.ai/api/coding/paas/v4
+
+# ❌ Standard Plan (pay-per-token) — will NOT work with Coding Plan keys
+https://api.z.ai/api/paas/v4
 ```
 
-This is the Coding Plan dedicated endpoint. The standard `paas/v4` endpoint will not work.
+If you're on the standard pay-per-token plan, use `paas/v4` instead and be aware of token costs.
 
 **2. Explicitly disable Thinking Mode**
 
@@ -119,9 +125,9 @@ GLM-5 has Thinking enabled by default. Without disabling it, `<think>…</think>
 extra_body={"thinking": {"type": "disabled"}}
 ```
 
-**3. Parallel requests are prohibited (must serialize)**
+**3. Parallel requests are rate-limited (must serialize)**
 
-Coding Plan has strict rate limits; multiple simultaneous requests will trigger 429 errors.
+The Coding Plan has strict concurrency limits; multiple simultaneous requests will trigger 429 errors.
 The error message says `"Insufficient balance"` but this actually means **too many parallel requests**.
 → Use `threading.Lock()` for a global lock to serialize (MIN_INTERVAL=3s recommended).
 
