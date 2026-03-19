@@ -25,6 +25,7 @@
 - 🌱 **Seed input** — Auto-extract agents and topics from free text or existing documents
 - 🔄 **Switchable LLM** — ZAI GLM-5 (cloud), Ollama (local), OpenRouter — switch with one env var
 - 💾 **Agent persistence** — Save, reuse, and rate your favorite agents
+- 🎭 **30 stock agents included** — Ready to debate out of the box: 21 countries, all 16 MBTI types, diverse archetypes (shitposter, doomer, boomer, academic, contrarian…). You can also **create your own agents** with custom personalities, speech patterns, and backgrounds
 
 ---
 
@@ -40,6 +41,22 @@
   - [OpenRouter](https://openrouter.ai) API key
 
 ### Setup
+
+> **💡 Recommended: Use [Claude Code](https://docs.anthropic.com/en/docs/claude-code) for setup**
+>
+> Claude Code can handle the entire installation process for you — cloning, dependency installation, environment configuration, and launching. Just paste this prompt:
+>
+> ```
+> Clone https://github.com/tak633b/41chan.git and set it up for me.
+> I want to use [Ollama with qwen3.5:9b / ZAI GLM-5 / OpenRouter] as the LLM backend.
+> Install all dependencies, configure .env, and start both the backend and frontend.
+> Backend on port 8001, frontend on port 3002.
+> ```
+>
+> Claude Code will read the README, install everything, and get it running. If you hit any issues, just ask it to fix them.
+
+<details>
+<summary>Manual setup (click to expand)</summary>
 
 ```bash
 # Clone the repo
@@ -57,6 +74,8 @@ cp .env.example .env
 cd frontend
 npm install
 ```
+
+</details>
 
 ### Running
 
