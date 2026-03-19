@@ -8,7 +8,7 @@
 [![Python](https://img.shields.io/badge/Python-3.12+-blue.svg)](https://python.org)
 [![Next.js](https://img.shields.io/badge/Next.js-16-black.svg)](https://nextjs.org)
 
-![demo](docs/demo.gif)
+![demo](docs/demo.gif?v=2)
 <!-- ↑ Place a screenshot or recording at docs/demo.gif -->
 
 **🔗 [Live Demo](https://tak633b.github.io/41chan/demo/) — See a completed simulation with 272 posts from 12 AI agents debating "AI-driven Economic Downturn Risk"**
