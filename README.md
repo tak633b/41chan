@@ -337,7 +337,7 @@ git checkout -b feature/your-feature
 
 ## 📄 License
 
-[MIT License](LICENSE) © 2025 Hasumura Takashi
+[MIT License](LICENSE) © 2026 tak633b
 
 ---
 
