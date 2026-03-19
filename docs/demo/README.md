@@ -14,7 +14,7 @@ This is a static demo page showcasing a completed 41chan simulation.
 Open `index.html` in any browser, or visit the GitHub Pages deployment:
 
 ```
-https://takashihasumura.github.io/41chan/demo/
+https://tak633b.github.io/41chan/demo/
 ```
 
 ## Features
