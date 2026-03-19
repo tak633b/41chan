@@ -245,21 +245,21 @@ class MemoryManager:
             messages = [
                 {
                     "role": "system",
-                    "content": "あなたはエージェントの記憶要約専門家です。",
+                    "content": "You are an expert at summarizing agent memories.",
                 },
                 {
                     "role": "user",
-                    "content": f"""以下のエピソードを要約してください。
-エージェント視点で書き、感情変化・印象変化・重要な発見を含めてください（300字以内）。
+                    "content": f"""Summarize the following episodes.
+Write from the agent's perspective in first person. Include emotional shifts, impression changes, and key discoveries (300 words max).
 
 {episodes_text}
 
-要約（エージェント視点の一人称で）:""",
+Summary (first person, agent's perspective):""",
                 },
             ]
             summary = self.llm.chat(messages, temperature=0.3)
         except Exception as e:
-            summary = f"[要約失敗: {e}] " + "; ".join(r[2][:30] for r in rows[:3])
+            summary = f"[Summary failed: {e}] " + "; ".join(r[2][:30] for r in rows[:3])
 
         # 要約を新規エピソードとして保存
         summary_episode_id = str(uuid.uuid4())
@@ -504,25 +504,25 @@ class MemoryManager:
                 messages = [
                     {
                         "role": "system",
-                        "content": "あなたはエージェントの記憶蒸留専門家です。",
+                        "content": "You are an expert at distilling agent memories from discussions.",
                     },
                     {
                         "role": "user",
-                        "content": f"""あなたは{agent_id}です。今日の議論「{theme}」で以下の投稿をしました。
+                        "content": f"""You are {agent_id}. Today you participated in a discussion about "{theme}" and made the following posts:
 
 {posts_text}
 
-この議論を振り返り、以下を含めて300字以内で記録してください：
-①印象に残った議論の流れや発言
-②自分の立場・感情の変化
-③次回以降に活かしたい気づき
+Reflect on this discussion and write a 300-word max summary including:
+1. Notable discussion points or statements that stood out
+2. How your stance or emotions shifted
+3. Insights to carry forward into future discussions
 
-一人称で、内省的に書いてください。""",
+Write in first person, introspectively.""",
                     },
                 ]
                 distilled = self.llm.chat(messages, temperature=0.3)
             except Exception as e:
-                print(f"[MemoryManager] LLM蒸留失敗 {agent_id}: {e} — フォールバック使用")
+                print(f"[MemoryManager] LLM distillation failed {agent_id}: {e} — using fallback")
                 distilled = " ".join(all_posts[:2])[:300]
         else:
             # LLMなし: フォールバック

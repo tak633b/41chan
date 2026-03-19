@@ -14,51 +14,38 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <head>
-        <link
-          rel="preconnect"
-          href="https://fonts.googleapis.com"
-        />
-        <link
-          rel="preconnect"
-          href="https://fonts.gstatic.com"
-          crossOrigin="anonymous"
-        />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap"
-          rel="stylesheet"
-        />
-      </head>
       <body>
-        <header className="ochch-header">
-          <div className="ochch-site-title">
-            <Link href="/">41chan</Link>
+        {/* Board list bar */}
+        <div className="board-list-bar">
+          [<Link href="/">Home</Link>] [<Link href="/new">New Simulation</Link>] [<Link href="/agents">Agents</Link>]
+        </div>
+
+        {/* Board banner */}
+        <div className="board-banner">
+          <div className="board-banner-title">
+            <Link href="/" style={{ color: "#af0a0f", textDecoration: "none" }}>
+              /sim/ - AI Simulation
+            </Link>
           </div>
-          <div>
-            <Link href="/new">New Simulation</Link>
-          </div>
-        </header>
-        <nav className="ochch-nav">
-          [<Link href="/">TOP</Link>]{" "}
-          [<Link href="/new">New Sim</Link>]{" "}
-          [<span style={{ color: "#222" }}>/sim/ - AI Simulation</span>]
-          <span style={{ color: "#888", marginLeft: 8 }}>
-            41chan v1.0
-          </span>
-        </nav>
+          <div className="board-banner-subtitle">41chan</div>
+        </div>
+
         <main className="ochch-main">{children}</main>
-        <footer
-          style={{
-            borderTop: "1px solid #b7c5d9",
-            padding: "6px 12px",
-            fontSize: 11,
-            color: "#888",
-            marginTop: 20,
-            textAlign: "center",
-          }}
-        >
-          All stories are entirely fictional. All trademarks and copyrights belong to their respective owners.
-        </footer>
+
+        {/* Footer */}
+        <div style={{ borderTop: "1px solid #b7c5d9", marginTop: 20 }}>
+          <div
+            style={{
+              padding: "6px 8px",
+              fontSize: "9pt",
+              color: "#707070",
+              textAlign: "center",
+              fontFamily: "arial, helvetica, sans-serif",
+            }}
+          >
+            All stories are entirely fictional. All trademarks and copyrights belong to their respective owners.
+          </div>
+        </div>
       </body>
     </html>
   );

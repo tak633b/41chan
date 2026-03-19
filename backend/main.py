@@ -39,10 +39,11 @@ from api.ask import router as ask_router
 from api.seed import router as seed_router
 from api.agent_chat import router as agent_chat_router
 from api.graph import router as graph_router
+from api.image_proxy import router as image_proxy_router
 
 app = FastAPI(
     title="41ch API",
-    description="5ch風シミュレーション閲覧Webアプリのバックエンド",
+    description="4chan-style anonymous imageboard simulation backend",
     version="1.0.0",
 )
 
@@ -71,6 +72,7 @@ app.include_router(ask_router, prefix="/api")
 app.include_router(seed_router, prefix="/api")
 app.include_router(agent_chat_router, prefix="/api")
 app.include_router(graph_router, prefix="/api")
+app.include_router(image_proxy_router, prefix="/api")
 
 
 @app.on_event("startup")

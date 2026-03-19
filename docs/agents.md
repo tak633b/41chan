@@ -1,112 +1,112 @@
-# エージェント設計 / Agent Design
+# Agent Design
 
-## 概要
+## Overview
 
-41ch のエージェントは、5ちゃんねる住民のリアルな投稿行動を再現するために設計されています。各エージェントは以下の要素を持ちます。
+41chan agents are designed to reproduce realistic posting behavior of 4chan-style imageboard users. Each agent has the following attributes.
 
-## エージェント構成要素
+## Agent Components
 
-### 基本属性
+### Basic Attributes
 
-| 属性 | 説明 | 例 |
+| Attribute | Description | Example |
 |------|------|-----|
-| `name` | 日本人フルネーム | 田中太郎 |
-| `username` | コテハン（掲示板ID） | tanaka_123 |
-| `age` | 年齢 | 35 |
-| `gender` | 性別 | male / female |
-| `mbti` | MBTIタイプ | INTJ |
-| `profession` | 職業 | 大学教授 |
+| `name` | Full name | John Smith |
+| `username` | Display name (board ID) | anon_123 |
+| `age` | Age | 35 |
+| `gender` | Gender | male / female |
+| `mbti` | MBTI type | INTJ |
+| `profession` | Profession | University professor |
 
-### 口調タイプ（tone_style）
+### Tone Style (tone_style)
 
-5種類の口調タイプがエージェントの発言スタイルを決定します。
+Five tone types determine each agent's speaking style.
 
-| タイプ | ラベル | 特徴 | 投稿頻度 |
+| Type | Label | Characteristics | Post Frequency |
 |--------|--------|------|----------|
-| `authority` | 権威層 | 教授・管理職。丁寧だが断定的 | 3-5ラウンドに1回 |
-| `worker` | 実務層 | 技術員・事務職。現場感のある標準語 | 2-3ラウンドに1回 |
-| `youth` | 若手層 | 学生・若手。なんJ寄りカジュアル | 1-2ラウンドに1回 |
-| `outsider` | 外部者 | 業者・行政。ビジネス丁寧語 | 5-10ラウンドに1回 |
-| `lurker` | ROM専 | 観察者。たまに鋭い一言 | 10-20ラウンドに1回 |
+| `authority` | Authority | Professors, managers. Polite but assertive | Once every 3-5 rounds |
+| `worker` | Worker | Technicians, office staff. Grounded, standard tone | Once every 2-3 rounds |
+| `youth` | Youth | Students, young people. Casual, meme-heavy | Once every 1-2 rounds |
+| `outsider` | Outsider | Vendors, officials. Formal business tone | Once every 5-10 rounds |
+| `lurker` | Lurker | Observers. Occasional sharp one-liners | Once every 10-20 rounds |
 
-### 投稿スタイル（posting_style）
+### Posting Style (posting_style)
 
-10種類の投稿スタイルがエージェントの書き込みパターンを決定します。
+Ten posting styles determine each agent's posting patterns.
 
-| スタイル | ラベル | 特徴 | 文長 |
+| Style | Label | Characteristics | Post Length |
 |----------|--------|------|------|
-| `info_provider` | 情報提供者 | ソース付き長文 | 長い |
-| `debater` | レスバ戦士 | 攻撃的、「はい論破」 | 短い |
-| `joker` | ネタ師 | 皮肉、ネットスラング | 短い |
-| `questioner` | 質問者 | 素朴な疑問 | 短い |
-| `veteran` | 古参 | 経験ベース、上から目線 | 中程度 |
-| `passerby` | 通りすがり | 1-2回だけ投稿 | 短い |
-| `emotional` | 感情的反応者 | 「ワロタ」「マジかよ」 | 極短 |
-| `storyteller` | 自分語り | 体験談ベース | 中程度 |
-| `agreeer` | 同意マン | 「それな」「ほんこれ」 | 極短 |
-| `contrarian` | 逆張り | 多数派と逆の意見 | 中程度 |
+| `info_provider` | Info Provider | Long posts with sources | Long |
+| `debater` | Debater | Aggressive, "checkmate" style | Short |
+| `joker` | Joker | Sarcasm, memes, slang | Short |
+| `questioner` | Questioner | Naive questions | Short |
+| `veteran` | Veteran | Experience-based, condescending | Medium |
+| `passerby` | Passerby | Posts only 1-2 times | Short |
+| `emotional` | Emotional | "lol", "wtf", "based" | Very short |
+| `storyteller` | Storyteller | Personal anecdotes | Medium |
+| `agreeer` | Agreeer | "this", "based", "+1" | Very short |
+| `contrarian` | Contrarian | Takes the opposite side of the majority | Medium |
 
-### 構造化ペルソナ
+### Structured Persona
 
-エージェントの `persona` フィールドは以下のタグ形式で構造化されています:
+The agent's `persona` field is structured with the following tag format:
 
 ```
-[identity]田中太郎は大学教授|[backstory]20年の研究歴|[personality]論理的だが頑固|
-[wound]研究費カットのトラウマ|[speech]「結論から言うと」「エビデンスは」|
-[board]週に数回書き込む|[stance_detail]AI活用に慎重|[hidden]実は興味がある|
-[trigger]予算の話になると熱くなる|[bias]日経新聞を信頼|
-[social]年収800万・50代|[tactics]データで反論|[memory]去年の学会での議論|
-[quirk]長文になりがち
+[identity]John Smith is a university professor|[backstory]20 years of research experience|[personality]Logical but stubborn|
+[wound]Trauma from research funding cuts|[speech]"In conclusion," "The evidence suggests"|
+[board]Posts a few times per week|[stance_detail]Cautious about AI adoption|[hidden]Actually interested|
+[trigger]Gets heated when budgets come up|[bias]Trusts mainstream media|
+[social]$120k salary, 50s|[tactics]Counters with data|[memory]Last year's conference debate|
+[quirk]Tends to write long posts
 ```
 
-### 立場（stance）
+### Stance
 
-エージェントはテーマに対する立場を持ちます:
+Agents hold a stance on the topic:
 
-- **賛成** — テーマを支持
-- **反対** — テーマに反対
-- **中立** — 条件付き
-- **懐疑** — 判断保留
+- **for** — Supports the topic
+- **against** — Opposes the topic
+- **neutral** — Conditional
+- **skeptical** — Reserves judgment
 
-立場はシステムが自動的に分散させ、全員が同じ意見にならないようにします。
+The system automatically distributes stances to ensure agents don't all share the same opinion.
 
-## エージェントの生成フロー
+## Agent Generation Flow
 
 ```mermaid
 graph LR
-    A[エンティティ抽出] --> B{ストック<br/>エージェント?}
-    B -->|あり| C[ストックから選択]
-    B -->|なし| D{永続<br/>エージェント?}
-    D -->|あり| E[永続から再利用]
-    D -->|なし| F[LLMで新規生成]
-    C --> G[立場を割り当て]
+    A[Entity Extraction] --> B{Stock<br/>Agents?}
+    B -->|Yes| C[Select from Stock]
+    B -->|No| D{Persistent<br/>Agents?}
+    D -->|Yes| E[Reuse Persistent]
+    D -->|No| F[Generate with LLM]
+    C --> G[Assign Stance]
     E --> G
     F --> G
-    G --> H[MBTI重複チェック]
-    H --> I[名前検証・生成]
-    I --> J[投稿スタイル割当]
-    J --> K[完成エージェント]
+    G --> H[MBTI Overlap Check]
+    H --> I[Name Validation & Generation]
+    I --> J[Assign Posting Style]
+    J --> K[Completed Agent]
 ```
 
-### 生成の優先順位
+### Generation Priority
 
-1. **ストックエージェント** (`agents/stock_agents.json`) — 事前定義済みの高品質エージェント
-2. **永続エージェント** (DB) — 過去のシミュレーションで保存・評価されたエージェント
-3. **LLM生成** — 上記が不足する場合、LLMでバッチ生成（3人ずつ）
+1. **Stock Agents** (`agents/stock_agents.json`) — Pre-defined high-quality agents
+2. **Persistent Agents** (DB) — Agents saved and rated from past simulations
+3. **LLM Generation** — When the above are insufficient, batch-generated via LLM (3 at a time)
 
-### 品質保証
+### Quality Assurance
 
-- **MBTI重複制御**: 同じMBTIタイプは最大2人まで
-- **口調タイプ分散**: 同じ口調タイプは最大2人まで
-- **名前検証**: 概念名・組織名を検出して日本人名に置換
-- **立場分散**: 賛成・反対・中立・懐疑をバランスよく配置
+- **MBTI overlap control**: Maximum 2 agents per MBTI type
+- **Tone type distribution**: Maximum 2 agents per tone type
+- **Name validation**: Detects concept/organization names and replaces with proper names
+- **Stance distribution**: Balances for, against, neutral, and skeptical stances
 
-## 永続エージェント
+## Persistent Agents
 
-シミュレーション後、エージェントを評価・保存できます:
+After a simulation, agents can be rated and saved:
 
-- 👍 **good** — 次回のシミュレーションで優先的に再利用
-- 👎 **bad** — 自動削除して新しいエージェントに入れ替え
-- 🔄 **アクティブ/休止** — 一時的に使用停止
+- 👍 **good** — Prioritized for reuse in future simulations
+- 👎 **bad** — Automatically deleted and replaced with new agents
+- 🔄 **active/inactive** — Temporarily suspended from use
 
-永続エージェントはフロントエンドの `/agents` ページで管理できます。
+Persistent agents can be managed on the `/agents` page in the frontend.

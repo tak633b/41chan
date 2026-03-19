@@ -1,14 +1,14 @@
-# アーキテクチャ / Architecture
+# Architecture
 
-## システム概要
+## System Overview
 
-41ch は「シードテキスト → エージェント生成 → 掲示板シミュレーション → レポート生成」の4段階パイプラインで動作します。
+41chan operates as a 4-stage pipeline: Seed Text → Agent Generation → Board Simulation → Report Generation.
 
-## 処理フロー
+## Processing Flow
 
 ```mermaid
 sequenceDiagram
-    participant U as ユーザー
+    participant U as User
     participant FE as Frontend (Next.js)
     participant API as Backend (FastAPI)
     participant PP as ParameterPlanner
@@ -19,116 +19,116 @@ sequenceDiagram
     participant LLM as LLMClient
     participant DB as SQLite
 
-    U->>FE: テーマ入力 + スケール選択
+    U->>FE: Enter theme + select scale
     FE->>API: POST /api/simulation/create
-    API->>DB: シミュレーション作成
+    API->>DB: Create simulation
 
-    API->>PP: パラメータ計画
-    PP->>LLM: テーマ分析
+    API->>PP: Plan parameters
+    PP->>LLM: Analyze theme
     LLM-->>PP: agent_roles, boards, rounds
 
-    API->>EE: エンティティ抽出
-    EE->>LLM: シードテキスト分析
+    API->>EE: Extract entities
+    EE->>LLM: Analyze seed text
     LLM-->>EE: entities, relationships, key_issues
 
-    API->>PG: エージェント生成
-    PG->>LLM: ペルソナ生成（バッチ3人ずつ）
+    API->>PG: Generate agents
+    PG->>LLM: Generate personas (batch of 3)
     LLM-->>PG: name, persona, mbti, tone...
 
-    loop 各ラウンド × 各スレッド
-        API->>BS: 投稿生成
-        BS->>LLM: 5ch風投稿生成
+    loop Each round x each thread
+        API->>BS: Generate posts
+        BS->>LLM: Generate 4chan-style posts
         LLM-->>BS: agent_name, content, anchor_to
-        BS->>DB: 投稿保存
+        BS->>DB: Save post
         API-->>FE: SSE (new_post)
     end
 
-    API->>RP: レポート生成（2段階）
-    RP->>LLM: Step1: 構造化データ(JSON)
-    RP->>LLM: Step2: 詳細分析(テキスト)
-    RP->>DB: レポート保存
+    API->>RP: Generate report (2 stages)
+    RP->>LLM: Step 1: Structured data (JSON)
+    RP->>LLM: Step 2: Detailed analysis (text)
+    RP->>DB: Save report
     API-->>FE: SSE (completed)
 ```
 
-## コアモジュール
+## Core Modules
 
 ### LLMClient (`core/llm_client.py`)
 
-統一LLMクライアント。ZAI / Ollama / OpenRouter を同一インターフェースで切替。
+Unified LLM client. Switches between ZAI / Ollama / OpenRouter with a single interface.
 
-- **ZAI**: OpenAI互換API、グローバルロックで直列化（429防止）
-- **Ollama**: ネイティブAPI直接呼び出し、`<think>` タグ自動除去
-- **OpenRouter**: OpenAI互換API
-- 全バックエンドで自動リトライ（指数バックオフ）
+- **ZAI**: OpenAI-compatible API, global lock for serialization (429 prevention)
+- **Ollama**: Native API direct calls, automatic `<think>` tag removal
+- **OpenRouter**: OpenAI-compatible API
+- Automatic retry with exponential backoff for all backends
 
 ### EntityExtractor (`core/entity_extractor.py`)
 
-シードテキストからエンティティ（人物・組織・概念）と関係性を抽出。
+Extracts entities (people, organizations, concepts) and relationships from seed text.
 
-- 出力: `entities[]`, `relationships[]`, `theme`, `key_issues[]`
+- Output: `entities[]`, `relationships[]`, `theme`, `key_issues[]`
 
 ### ParameterPlanner (`core/parameter_planner.py`)
 
-テーマからシミュレーションパラメータを自動決定。
+Automatically determines simulation parameters from the theme.
 
-- エージェント数、役割配分、板構成、ラウンド数を1回のLLM呼び出しで計画
-- 5ch風スレタイ（【悲報】【朗報】等）を自動生成
+- Plans agent count, role distribution, board structure, and round count in a single LLM call
+- Auto-generates 4chan-style thread titles (e.g., "[Serious]", "ITT:", "BREAKING:" etc.)
 
 ### ProfileGenerator (`core/profile_generator.py`)
 
-エンティティからリアルなエージェントプロファイルを生成。
+Generates realistic agent profiles from entities.
 
-- 5口調タイプ: authority / worker / youth / outsider / lurker
-- 10投稿スタイル: info_provider / debater / joker / questioner / veteran / passerby / emotional / storyteller / agreeer / contrarian
-- MBTI重複制御、日本人名自動生成、立場分散
-- ストックエージェント再利用対応
+- 5 tone types: authority / worker / youth / outsider / lurker
+- 10 posting styles: info_provider / debater / joker / questioner / veteran / passerby / emotional / storyteller / agreeer / contrarian
+- MBTI overlap control, automatic name generation, stance distribution
+- Stock agent reuse support
 
 ### BoardSimulator (`core/board_simulator.py`)
 
-スレッド単位で5ch風投稿を生成。
+Generates 4chan-style posts per thread.
 
-- アンカー返信 (`>>N`)、AA、ネットスラング
-- エージェントごとの投稿頻度・文体制御
-- ラウンド制で段階的に議論を深化
+- Quote replies (`>>N`), greentext, memes, slang
+- Per-agent post frequency and writing style control
+- Round-based gradual discussion progression
 
 ### MemoryManager (`core/memory_manager.py`)
 
-エージェントの記憶を管理。
+Manages agent memory.
 
-- SQLiteによる時系列管理
-- ChromaDB（オプション）によるセマンティック検索
-- 10件超で自動要約
+- Time-series management via SQLite
+- Semantic search via ChromaDB (optional)
+- Auto-summarization when exceeding 10 entries
 
 ### Reporter (`core/reporter.py`)
 
-シミュレーション結果から分析レポートを生成。
+Generates analysis reports from simulation results.
 
-- Step 1: 構造化データ（JSON）— 合意度、転換点、少数意見
-- Step 2: 詳細分析（テキスト）— バーチャル並行世界の記録として執筆
+- Step 1: Structured data (JSON) — consensus level, turning points, minority views
+- Step 2: Detailed analysis (text) — written as a record of a virtual parallel world
 
-## データベース
+## Database
 
-SQLite を使用。主要テーブル:
+Uses SQLite. Main tables:
 
-- `simulations` — シミュレーション管理
-- `boards` — 板
-- `threads` — スレッド
-- `posts` — 投稿
-- `agents` — エージェント（シミュレーション単位）
-- `persistent_agents` — 永続エージェント
-- `reports` — レポート
-- `ask_history` — 質問履歴
+- `simulations` — Simulation management
+- `boards` — Boards
+- `threads` — Threads
+- `posts` — Posts
+- `agents` — Agents (per simulation)
+- `persistent_agents` — Persistent agents
+- `reports` — Reports
+- `ask_history` — Question history
 
-## フロントエンド
+## Frontend
 
-Next.js 16 App Router + TailwindCSS + カスタム5ch CSS。
+Next.js 16 App Router + TailwindCSS + custom 4chan CSS.
 
-- `/` — シミュレーション一覧
-- `/new` — 新規作成
-- `/sim/[id]` — 詳細（板一覧、リアルタイム進行）
-- `/sim/[id]/board/[boardId]` — スレッド一覧
-- `/sim/[id]/thread/[threadId]` — スレッド表示
-- `/sim/[id]/agents` — エージェント一覧
-- `/sim/[id]/report` — レポート
-- `/sim/[id]/ask` — 質問スレ
-- `/agents` — 永続エージェント管理
+- `/` — Simulation list
+- `/new` — Create new simulation
+- `/sim/[id]` — Details (board list, real-time progress)
+- `/sim/[id]/board/[boardId]` — Thread list
+- `/sim/[id]/thread/[threadId]` — Thread view
+- `/sim/[id]/agents` — Agent list
+- `/sim/[id]/report` — Report
+- `/sim/[id]/ask` — Ask thread
+- `/agents` — Persistent agent management

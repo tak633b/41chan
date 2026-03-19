@@ -125,15 +125,15 @@ async def run_simulation(
             return
         update_simulation(sim_id, status="extracting", progress=0.05)
         await _emit(sim_id, "status_update", {"status": "extracting", "progress": 0.05, "prompt": prompt})
-        _save_jikkyo([f"シミュレーション開始するお", f"お題: 「{prompt[:60]}」"])
-        _save_jikkyo(["エンティティ抽出中... しばし待たれよ"])
+        _save_jikkyo(["Simulation starting", f"Topic: \"{prompt[:60]}\""])
+        _save_jikkyo(["Extracting entities... hold on"])
 
         full_seed = f"{prompt}\n\n{seed_text}" if seed_text else prompt
         llm_extract = llm  # 全処理で同じモデル（qwen3.5:9b）
         entity_data = await loop.run_in_executor(
             None, lambda: extract_entities(full_seed, llm_extract)
         )
-        theme = entity_data.get("theme", "議論テーマ")
+        theme = entity_data.get("theme", "Discussion Topic")
         entities = entity_data.get("entities", [])
         key_issues = entity_data.get("key_issues", [])
 
@@ -219,7 +219,7 @@ async def run_simulation(
                 )
 
         # エージェント生成をSSEに通知（+ 実況ログDB保存）
-        _save_jikkyo(["ﾜｸﾜｸ エージェント召喚中..."])
+        _save_jikkyo(["Summoning agents..."])
         for i, a in enumerate(oracle_agents, 1):
             await _emit(sim_id, "new_agent", {
                 "name": a.name,
@@ -227,8 +227,8 @@ async def run_simulation(
                 "personality_snippet": a.persona[:60] if a.persona else "",
             })
             _save_jikkyo([
-                f"キタ━━━(ﾟ∀ﾟ)━━━!! {i}人目",
-                f"「住人{str(i).zfill(2)}（{a.tone_style or '？'}）」",
+                f"Agent #{i} has entered the thread",
+                f"\"{a.name}\" ({a.tone_style or '?'})",
             ])
 
         update_simulation(
@@ -286,14 +286,14 @@ async def run_simulation(
                     thread_emit_queue.append((thread_id, board_id, title))
         # commit 完了後に emit（+ 実況ログDB保存）
         if board_emit_queue:
-            _save_jikkyo(["板を立ててくるお"])
+            _save_jikkyo(["Creating boards..."])
         for board_id, name, emoji, description in board_emit_queue:
             await _emit(sim_id, "board_created", {
                 "board_id": board_id, "name": name, "emoji": emoji, "description": description,
             })
             _save_jikkyo([
-                f"📋 {name} キタ━(ﾟ∀ﾟ)━!",
-                *([ f"（{description[:30]}）"] if description else []),
+                f"/{name}/ board created",
+                *([ f"({description[:30]})"] if description else []),
             ])
         for thread_id, board_id, title in thread_emit_queue:
             await _emit(sim_id, "thread_created", {
@@ -406,7 +406,7 @@ async def run_simulation(
                             (
                                 post_id, thread_id, board_id, sim_id, post_num,
                                 p.get("agent_name", ""),
-                                p.get("username", "名無し"),
+                                p.get("username", "Anonymous"),
                                 p.get("content", ""),
                                 p.get("anchor_to"),
                                 p.get("emotion", "neutral"),
@@ -428,7 +428,7 @@ async def run_simulation(
                         "board_id": board_id,
                         "thread_id": thread_id,
                         "agent_name": p.get("agent_name", ""),
-                        "username": p.get("username", "名無し"),
+                        "username": p.get("username", "Anonymous"),
                         "post_num": post_num,
                         "delay_ms": 300 + (hash(post_id) % 6) * 100,
                     })
@@ -439,7 +439,7 @@ async def run_simulation(
                         "post": {
                             "post_id": post_id, "post_num": post_num,
                             "agent_name": p.get("agent_name", ""),
-                            "username": p.get("username", "名無し"),
+                            "username": p.get("username", "Anonymous"),
                             "content": p.get("content", ""),
                             "reply_to": p.get("anchor_to"),
                             "timestamp": ts,
@@ -593,8 +593,8 @@ async def run_simulation(
 
         _save_jikkyo([
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-            f"シミュレーション完了！ 総レス数: {total_posts_global}",
-            "レポートが生成されました。上のタブから確認できます",
+            f"Simulation complete! Total posts: {total_posts_global}",
+            "Report generated. Check the tabs above.",
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
         ])
         await _emit(sim_id, "sim_complete", {

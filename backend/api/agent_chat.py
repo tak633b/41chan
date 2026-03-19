@@ -1,7 +1,7 @@
 """
-エージェント対話 API（Post-sim Agent Chat）
-POST /api/simulation/{sim_id}/agent/{agent_id}/chat — エージェントに質問
-GET  /api/simulation/{sim_id}/agent/{agent_id}/chat/history — チャット履歴取得
+Agent Chat API (Post-sim Agent Chat)
+POST /api/simulation/{sim_id}/agent/{agent_id}/chat — Chat with an agent
+GET  /api/simulation/{sim_id}/agent/{agent_id}/chat/history — Get chat history
 """
 
 import asyncio
@@ -24,7 +24,7 @@ class ChatRequest(BaseModel):
 
 @router.post("/simulation/{sim_id}/agent/{agent_id}/chat")
 async def chat_with_agent(sim_id: str, agent_id: str, req: ChatRequest):
-    """エージェントに質問する"""
+    """Chat with an agent in character"""
     sim = get_simulation(sim_id)
     if not sim:
         raise HTTPException(status_code=404, detail="Simulation not found")
@@ -50,11 +50,11 @@ async def chat_with_agent(sim_id: str, agent_id: str, req: ChatRequest):
     tone_style = agent.get("tone_style", "")
     stance = agent.get("stance", "{}")
 
-    # 投稿履歴テキスト
+    # Post history text
     posts_text = "\n".join([
         f"  >>{p['post_num']} (Round {p['round_num']}): {p['content'][:200]}"
         for p in posts
-    ]) if posts else "（投稿なし）"
+    ]) if posts else "(No posts)"
 
     # チャット履歴取得
     history = get_agent_chat_history(sim_id, agent_id)
@@ -62,26 +62,26 @@ async def chat_with_agent(sim_id: str, agent_id: str, req: ChatRequest):
     # ユーザーメッセージを保存
     add_agent_chat_message(sim_id, agent_id, "user", req.message)
 
-    # LLMプロンプト構築
-    system_prompt = f"""あなたは「{agent_name}」です。以下の設定に従って、自分の言葉で答えてください。
+    # Build LLM prompt
+    system_prompt = f"""You are "{agent_name}". Answer in character based on the following profile.
 
-【設定】
-名前: {agent_name}
-プロフィール: {bio}
-ペルソナ: {persona}
-口調: {tone_style}
-立場: {stance}
+[Profile]
+Name: {agent_name}
+Bio: {bio}
+Persona: {persona}
+Tone/Style: {tone_style}
+Stance: {stance}
 
-【あなたがした投稿】
+[Your posts in the thread]
 {posts_text}
 
-【ルール】
-- あなたは上記の投稿をした本人として答える
-- 「なぜそう書いたのか」「どう思っているのか」を自分の言葉で説明する
-- キャラクターの口調・性格を維持する
-- 5chの住人としてのカジュアルな口調で答える（敬語禁止）
-- 日本語のみ
-- 200字以内で簡潔に"""
+[Rules]
+- You ARE the person who wrote the posts above. Answer as yourself.
+- Explain why you wrote what you wrote, and what you really think.
+- Stay in character — maintain your tone, personality, and mannerisms.
+- Write like an anonymous imageboard user — casual, blunt, no formalities.
+- English only. No Japanese. No Chinese.
+- Keep it under 100 words."""
 
     messages = [{"role": "system", "content": system_prompt}]
 
@@ -114,14 +114,14 @@ async def chat_with_agent(sim_id: str, agent_id: str, req: ChatRequest):
 
 @router.get("/simulation/{sim_id}/agent/{agent_id}/chat/history")
 async def get_chat_history(sim_id: str, agent_id: str):
-    """チャット履歴取得"""
+    """Get chat history"""
     history = get_agent_chat_history(sim_id, agent_id)
     return {"history": history}
 
 
 @router.get("/simulation/{sim_id}/agent/{agent_id}/profile")
 async def get_agent_profile(sim_id: str, agent_id: str):
-    """エージェントプロフィール取得"""
+    """Get agent profile"""
     sim = get_simulation(sim_id)
     if not sim:
         raise HTTPException(status_code=404, detail="Simulation not found")

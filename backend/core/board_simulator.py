@@ -352,11 +352,7 @@ class BoardSimulator:
 
     def _generate_thread_opener(self):
         """Generate >>1 OP post via template (no LLM call needed)"""
-        content = (
-            f"[{self.thread_title}]\n"
-            f"Theme: {self.theme}\n\n"
-            f"Discuss, anons."
-        )
+        content = f"Discuss, anons."
 
         post_time = self.base_time
         username = f"Anonymous@{self.board_name}"
@@ -397,21 +393,25 @@ class BoardSimulator:
 
         print(f"[BoardSim] Done: {self.post_counter} posts generated\n")
 
-        # After sim: distill all agent experiences into long-term memory
-        print(f"[BoardSim] Starting long-term memory distillation...", flush=True)
-        for agent in self.agents:
-            agent_posts = [p["content"] for p in self.posts if p.get("agent_name") == agent.name]
-            if len(agent_posts) >= 2:
-                try:
-                    self.memory.distill_experience(
-                        agent_id=agent.name,
-                        sim_id=self.memory.project_id,
-                        theme=self.theme,
-                        all_posts=agent_posts,
-                    )
-                    print(f"[BoardSim] Long-term memory saved: {agent.name}", flush=True)
-                except Exception as e:
-                    print(f"[BoardSim] Long-term memory distillation failed {agent.name}: {e}", flush=True)
+        # Distill agent experiences in background thread (don't block sim completion)
+        import threading
+        def _distill_bg():
+            print(f"[BoardSim] Starting long-term memory distillation (background)...", flush=True)
+            for agent in self.agents:
+                agent_posts = [p["content"] for p in self.posts if p.get("agent_name") == agent.name]
+                if len(agent_posts) >= 2:
+                    try:
+                        self.memory.distill_experience(
+                            agent_id=agent.name,
+                            sim_id=self.memory.project_id,
+                            theme=self.theme,
+                            all_posts=agent_posts,
+                        )
+                        print(f"[BoardSim] Long-term memory saved: {agent.name}", flush=True)
+                    except Exception as e:
+                        print(f"[BoardSim] Long-term memory distillation failed {agent.name}: {e}", flush=True)
+            print(f"[BoardSim] Long-term memory distillation done.", flush=True)
+        threading.Thread(target=_distill_bg, daemon=True).start()
 
         return self._format_thread()
 

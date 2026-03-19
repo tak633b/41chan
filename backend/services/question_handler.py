@@ -12,32 +12,32 @@ from typing import Any, AsyncGenerator, Dict, List
 from core.llm_client import OracleLLMClient
 from core.memory_manager import MemoryManager
 
-ANSWER_SYSTEM = """あなたは掲示板キャラクターです。
-ペルソナと口調を忠実に守って、質問に1〜3文で回答してください。
-必ず日本語で回答してください。"""
+ANSWER_SYSTEM = """You are an anonymous imageboard character.
+Stay faithful to your persona and tone. Answer the question in 1-3 sentences.
+English only. No Japanese. No Chinese."""
 
-ANSWER_PROMPT = """あなたは「{agent_name}」というキャラクターです。
+ANSWER_PROMPT = """You are "{agent_name}", an anonymous imageboard poster.
 
-【キャラクタープロフィール】
+[Character Profile]
 {persona}
 
-【口調タイプ】{tone_style}
-- authority（権威層）: 敬語・断定的・長文。「〜でしょう」「〜と考えます」
-- worker（実務層）: 現場感のある標準語。です/ます混在
-- youth（若手層）: なんJ語・「ワイ」「草」「それな」「〜やろ」
-- outsider（外部者）: ビジネス丁寧語・定型表現
-- lurker（ROM専）: 一言・核心を突く
+[Tone/Style] {tone_style}
+- authority: Authoritative, assertive, formal. "I believe...", "It's clear that..."
+- worker: Practical, matter-of-fact, mixes formal/informal.
+- youth: Shitposter energy. "lmao", "based", "cope", "literally who"
+- outsider: Polite, business-like, formulaic.
+- lurker: Terse, one-liners, cuts to the heart of it.
 
-【立場】{stance}
+[Stance] {stance}
 
-【あなたの記憶（参考）】
+[Your memories (reference)]
 {memories}
 
-【ユーザーの質問】
+[User's question]
 {question}
 
-上記の質問に対して、あなたのキャラクターとして1〜3文で回答してください。
-口調・立場・記憶に基づいた自然な回答を生成してください。"""
+Answer the above question as your character in 1-3 sentences.
+Stay true to your tone, stance, and memories. English only."""
 
 
 async def generate_answers(
@@ -86,8 +86,8 @@ async def generate_answers(
     post_num_start = 1000  # 質問スレの番号は1000番台から
 
     for i, agent in enumerate(selected):
-        agent_name = agent.get("name", "不明")
-        username = agent.get("username", "名無し")
+        agent_name = agent.get("name", "Unknown")
+        username = agent.get("username", "Anonymous")
         persona = agent.get("persona", "")[:500]
         tone_style = agent.get("tone_style", "worker")
         stance_dict = agent.get("stance", {})
@@ -96,7 +96,7 @@ async def generate_answers(
                 stance_dict = json.loads(stance_dict)
             except Exception:
                 stance_dict = {}
-        stance = stance_dict.get("position", "中立") + " — " + stance_dict.get("reason", "")
+        stance = stance_dict.get("position", "Neutral") + " — " + stance_dict.get("reason", "")
 
         # 記憶を取得
         try:
@@ -108,7 +108,7 @@ async def generate_answers(
             )
             mem_text = "\n".join(f"- {m['content'][:80]}" for m in memories[:3])
         except Exception:
-            mem_text = "（記憶なし）"
+            mem_text = "(No memories)"
 
         # 考え中イベント
         yield {"type": "thinking", "data": {"agent_name": agent_name}}
@@ -134,7 +134,7 @@ async def generate_answers(
                 None, lambda m=messages: llm.chat(m, temperature=0.85)
             )
         except Exception as e:
-            content = f"（回答生成エラー: {e}）"
+            content = f"(Error generating response: {e})"
 
         post_num = post_num_start + i
         timestamp = datetime.now().strftime("%Y/%m/%d %H:%M")

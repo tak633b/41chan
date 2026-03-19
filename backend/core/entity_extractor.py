@@ -1,6 +1,6 @@
 """
-Oracle エンティティ抽出器
-シードテキストからエンティティ（人物・組織・概念）と関係を抽出する。
+Entity Extractor
+Extract entities (people, organizations, concepts) and relationships from seed text.
 """
 
 import json
@@ -8,42 +8,41 @@ from typing import Dict, Any
 from .llm_client import OracleLLMClient
 
 
-EXTRACT_SYSTEM = "テキスト分析の専門家。JSONのみ返す。説明文は書くな。思考タグなし。<think>を使うな。"
+EXTRACT_SYSTEM = "You are a text analysis expert. Return ONLY JSON. No explanations. No thinking tags. Do not use <think>."
 
-EXTRACT_USER_TEMPLATE = """以下のテーマを分析し、エンティティと関係を抽出してJSON返せ。
+EXTRACT_USER_TEMPLATE = """Analyze the following topic and extract entities and relationships as JSON.
 
-テーマ: {seed_text}
+Topic: {seed_text}
 
-形式:
-{{"entities":[{{"name":"名前","type":"person","description":"説明20字以内"}}],"relationships":[{{"source":"A","target":"B","type":"opposes","description":"関係10字"}}],"theme":"テーマ20字以内","key_issues":["争点1","争点2"]}}
+Format:
+{{"entities":[{{"name":"name","type":"person","description":"brief description"}}],"relationships":[{{"source":"A","target":"B","type":"opposes","description":"relationship"}}],"theme":"theme in 50 chars","key_issues":["issue1","issue2"]}}
 
-ルール:
-- エンティティ5〜8個（person/organization/concept）
-- relationships 3〜5個
-- key_issues 3個
-- 短く簡潔に"""
+Rules:
+- 5-8 entities (person/organization/concept)
+- 3-5 relationships
+- 3 key_issues
+- Keep it concise"""
 
 
 def _fallback_entities(seed_text: str) -> Dict[str, Any]:
-    """LLM失敗時のシンプルフォールバック（テキストから最低限のエンティティを推定）"""
-    # テーマを先頭50字から推定
-    theme = seed_text[:50].strip().rstrip("。、？！")
+    """Simple fallback when LLM fails — infer minimal entities from text."""
+    theme = seed_text[:50].strip().rstrip(".!?")
     return {
         "entities": [
-            {"name": "賛成派", "type": "concept", "description": "テーマに賛成する立場", "attributes": {"stance": "賛成", "role": "", "motivation": ""}},
-            {"name": "反対派", "type": "concept", "description": "テーマに反対する立場", "attributes": {"stance": "反対", "role": "", "motivation": ""}},
-            {"name": "中立派", "type": "concept", "description": "中立的な立場", "attributes": {"stance": "中立", "role": "", "motivation": ""}},
+            {"name": "Proponents", "type": "concept", "description": "Those in favor", "attributes": {"stance": "for", "role": "", "motivation": ""}},
+            {"name": "Opponents", "type": "concept", "description": "Those against", "attributes": {"stance": "against", "role": "", "motivation": ""}},
+            {"name": "Neutrals", "type": "concept", "description": "Neutral parties", "attributes": {"stance": "neutral", "role": "", "motivation": ""}},
         ],
         "relationships": [
-            {"source": "賛成派", "target": "反対派", "type": "opposes", "description": "意見対立"},
+            {"source": "Proponents", "target": "Opponents", "type": "opposes", "description": "Opposing views"},
         ],
         "theme": theme,
-        "key_issues": ["賛否の根拠", "影響範囲", "今後の展望"],
+        "key_issues": ["Arguments for and against", "Scope of impact", "Future outlook"],
     }
 
 
 def extract_entities(seed_text: str, llm: OracleLLMClient) -> Dict[str, Any]:
-    """シードテキストからエンティティと関係を抽出する。"""
+    """Extract entities and relationships from seed text."""
     messages = [
         {"role": "system", "content": EXTRACT_SYSTEM},
         {"role": "user", "content": EXTRACT_USER_TEMPLATE.format(seed_text=seed_text)},
@@ -52,7 +51,7 @@ def extract_entities(seed_text: str, llm: OracleLLMClient) -> Dict[str, Any]:
     try:
         result = llm.chat_json(messages, temperature=0.3)
     except (ValueError, Exception) as e:
-        print(f"[EntityExtractor] chat_json失敗、フォールバック使用: {e}", flush=True)
+        print(f"[EntityExtractor] chat_json failed, using fallback: {e}", flush=True)
         result = _fallback_entities(seed_text)
 
     if "entities" not in result:
@@ -60,7 +59,7 @@ def extract_entities(seed_text: str, llm: OracleLLMClient) -> Dict[str, Any]:
     if "relationships" not in result:
         result["relationships"] = []
     if "theme" not in result:
-        result["theme"] = "未知のテーマ"
+        result["theme"] = "Unknown topic"
     if "key_issues" not in result:
         result["key_issues"] = []
 

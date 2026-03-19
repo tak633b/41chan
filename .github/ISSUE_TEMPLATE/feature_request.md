@@ -1,27 +1,27 @@
 ---
-name: ✨ 機能提案 / Feature Request
-about: 新しい機能やアイデアを提案してください
+name: "\u2728 Feature Request"
+about: Suggest a new feature or idea
 title: '[Feature] '
 labels: enhancement
 assignees: ''
 ---
 
-## 概要 / Summary
+## Summary
 
-提案する機能の簡潔な説明。
+A brief description of the proposed feature.
 
-## モチベーション / Motivation
+## Motivation
 
-なぜこの機能が必要か。どんな問題を解決するか。
+Why is this feature needed? What problem does it solve?
 
-## 提案する解決策 / Proposed Solution
+## Proposed Solution
 
-具体的な実装イメージがあれば記述。
+Describe the implementation if you have a specific idea.
 
-## 代替案 / Alternatives
+## Alternatives
 
-検討した他のアプローチがあれば記述。
+Other approaches you've considered.
 
-## 追加情報 / Additional Context
+## Additional Context
 
-参考リンク、スクリーンショットなど。
+Reference links, screenshots, etc.

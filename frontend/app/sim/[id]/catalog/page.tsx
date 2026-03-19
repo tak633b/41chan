@@ -57,7 +57,6 @@ export default function CatalogPage({
         );
 
         if (!cancelled) {
-          // Sort by post count descending (most active first)
           const sorted = [...allThreads].sort(
             (a, b) => b.post_count - a.post_count
           );
@@ -84,7 +83,7 @@ export default function CatalogPage({
         <div className="catalog-nav">
           [<Link href={`/sim/${id}`}>Return</Link>]
         </div>
-        <div style={{ padding: 20, textAlign: "center", color: "#888" }}>
+        <div style={{ padding: 20, textAlign: "center", color: "#707070" }}>
           Loading catalog...
         </div>
       </div>
@@ -97,7 +96,7 @@ export default function CatalogPage({
         <div className="catalog-nav">
           [<Link href={`/sim/${id}`}>Return</Link>]
         </div>
-        <div style={{ padding: 20, color: "#c00" }}>Error: {error}</div>
+        <div style={{ padding: 20, color: "#d00000", fontSize: "9pt" }}>Error: {error}</div>
       </div>
     );
   }
@@ -142,7 +141,7 @@ export default function CatalogPage({
       </div>
 
       {threads.length === 0 && (
-        <div style={{ padding: 20, textAlign: "center", color: "#888" }}>
+        <div style={{ padding: 20, textAlign: "center", color: "#707070", fontSize: "9pt" }}>
           No threads found.
         </div>
       )}

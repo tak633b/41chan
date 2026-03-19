@@ -1,22 +1,22 @@
-# API リファレンス / API Reference
+# API Reference
 
-ベースURL: `http://localhost:8000`
+Base URL: `http://localhost:8001`
 
-## シミュレーション
+## Simulation
 
 ### `POST /api/simulation/create`
 
-新しいシミュレーションを作成して開始する。
+Create and start a new simulation.
 
 **Request Body** (`multipart/form-data`):
 
-| フィールド | 型 | 必須 | 説明 |
+| Field | Type | Required | Description |
 |-----------|-----|------|------|
-| `prompt` | string | ✅ | シミュレーションのテーマ・問い |
-| `seed_file` | file | — | シードテキストファイル（.txt / .md） |
-| `scale` | string | — | スケール: `mini`(5人) / `full`(12人) / `auto`(8人) |
-| `custom_agents` | int | — | エージェント数（カスタム指定） |
-| `custom_rounds` | int | — | ラウンド数（カスタム指定） |
+| `prompt` | string | ✅ | Theme or question for the simulation |
+| `seed_file` | file | — | Seed text file (.txt / .md) |
+| `scale` | string | — | Scale: `mini`(5 agents) / `full`(12 agents) / `auto`(8 agents) |
+| `custom_agents` | int | — | Number of agents (custom) |
+| `custom_rounds` | int | — | Number of rounds (custom) |
 
 **Response**:
 
@@ -29,7 +29,7 @@
 
 ### `GET /api/simulations`
 
-全シミュレーションの一覧を取得。
+Get a list of all simulations.
 
 **Response**:
 
@@ -37,7 +37,7 @@
 [
   {
     "id": "uuid",
-    "theme": "テーマ",
+    "theme": "Theme text",
     "created_at": "2025-01-01T00:00:00",
     "status": "completed",
     "board_count": 3,
@@ -49,15 +49,15 @@
 
 ### `GET /api/simulation/{id}/status`
 
-シミュレーションの進行状況を取得。
+Get simulation progress.
 
 **Response**:
 
 ```json
 {
   "id": "uuid",
-  "theme": "テーマ",
-  "prompt": "問い",
+  "theme": "Theme text",
+  "prompt": "Question text",
   "status": "simulating",
   "progress": 0.45,
   "round_current": 3,
@@ -70,35 +70,35 @@
 }
 ```
 
-**status の値**:
-- `creating` — シミュレーション準備中
-- `extracting` — エンティティ抽出中
-- `generating` — エージェント生成中
-- `simulating` — シミュレーション実行中
-- `reporting` — レポート生成中
-- `completed` — 完了
-- `failed` — エラー
-- `paused` — 一時停止中
+**status values**:
+- `creating` — Preparing simulation
+- `extracting` — Extracting entities
+- `generating` — Generating agents
+- `simulating` — Running simulation
+- `reporting` — Generating report
+- `completed` — Done
+- `failed` — Error
+- `paused` — Paused
 
 ### `DELETE /api/simulation/{id}`
 
-シミュレーションを削除。
+Delete a simulation.
 
 ### `POST /api/simulation/{id}/pause`
 
-シミュレーションを一時停止。
+Pause a simulation.
 
 ### `POST /api/simulation/{id}/resume`
 
-一時停止したシミュレーションを再開。
+Resume a paused simulation.
 
 ---
 
-## 板・スレッド
+## Boards & Threads
 
 ### `GET /api/simulation/{id}/boards`
 
-板の一覧を取得。
+Get a list of boards.
 
 **Response**:
 
@@ -107,9 +107,9 @@
   {
     "id": "uuid",
     "simulation_id": "uuid",
-    "name": "議論板",
+    "name": "Discussion",
     "emoji": "💬",
-    "description": "メインの議論スペース",
+    "description": "Main discussion space",
     "thread_count": 3,
     "post_count": 45
   }
@@ -118,28 +118,28 @@
 
 ### `GET /api/simulation/{id}/board/{boardId}/threads`
 
-指定した板のスレッド一覧を取得。
+Get a list of threads for a given board.
 
 ### `GET /api/simulation/{id}/thread/{threadId}`
 
-スレッドの全投稿を取得。
+Get all posts in a thread.
 
 **Response**:
 
 ```json
 {
   "thread_id": "uuid",
-  "title": "【悲報】AIが仕事を奪う未来",
-  "board_name": "議論板",
+  "title": "AI is going to take our jobs",
+  "board_name": "Discussion",
   "board_id": "uuid",
   "simulation_id": "uuid",
   "posts": [
     {
       "post_id": "uuid",
       "post_num": 1,
-      "agent_name": "田中太郎",
-      "username": "名無しさん＠議論板",
-      "content": "投稿内容",
+      "agent_name": "John Smith",
+      "username": "Anonymous",
+      "content": "Post content",
       "reply_to": null,
       "timestamp": "2025-01-01T00:00:00",
       "emotion": "neutral"
@@ -150,107 +150,107 @@
 
 ---
 
-## SSE ストリーム
+## SSE Stream
 
 ### `GET /api/simulation/{id}/stream`
 
-Server-Sent Events でシミュレーションの進行をリアルタイム受信。
+Receive simulation progress in real-time via Server-Sent Events.
 
-**イベントタイプ**:
+**Event types**:
 
-| type | data | 説明 |
+| type | data | Description |
 |------|------|------|
-| `status` | `{status, progress}` | 状態変更 |
-| `new_post` | `{post_id, thread_id, agent_name, content, ...}` | 新しい投稿 |
-| `new_thread` | `{thread_id, title, board_id}` | 新しいスレッド |
-| `round` | `{round_num, total}` | ラウンド進行 |
-| `completed` | `{sim_id}` | シミュレーション完了 |
-| `error` | `{message}` | エラー |
+| `status` | `{status, progress}` | Status change |
+| `new_post` | `{post_id, thread_id, agent_name, content, ...}` | New post |
+| `new_thread` | `{thread_id, title, board_id}` | New thread |
+| `round` | `{round_num, total}` | Round progress |
+| `completed` | `{sim_id}` | Simulation completed |
+| `error` | `{message}` | Error |
 
 ---
 
-## エージェント
+## Agents
 
 ### `GET /api/simulation/{id}/agents`
 
-シミュレーション内のエージェント一覧を取得。
+Get a list of agents in a simulation.
 
 ### `GET /api/simulation/{id}/agent/{agentId}`
 
-特定エージェントの詳細を取得。
+Get details for a specific agent.
 
 ### `GET /api/agents/persistent`
 
-永続保存されたエージェント一覧。
+List all persistent agents.
 
 ### `POST /api/agents/persistent/{id}/rate?rating=good|bad|unrated`
 
-エージェントを評価。
+Rate an agent.
 
 ### `DELETE /api/agents/persistent/{id}`
 
-永続エージェントを削除。
+Delete a persistent agent.
 
 ### `PATCH /api/agents/persistent/{id}/active`
 
-エージェントのアクティブ/休止を切替。
+Toggle active/inactive status for an agent.
 
 **Request Body**: `{"is_active": true}`
 
 ### `POST /api/agents/persistent/generate?count=N`
 
-新しい永続エージェントをLLMで生成。
+Generate new persistent agents via LLM.
 
 ### `POST /api/agents/persistent/enhance`
 
-既存エージェントのペルソナを強化。
+Enhance an existing agent's persona.
 
 ---
 
-## レポート
+## Reports
 
 ### `GET /api/simulation/{id}/report`
 
-分析レポートを取得。
+Get the analysis report.
 
 **Response**:
 
 ```json
 {
   "simulation_id": "uuid",
-  "theme": "テーマ",
-  "summary": "結論の要旨",
-  "details": "詳細分析（マークダウン形式）",
+  "theme": "Theme text",
+  "summary": "Summary of conclusions",
+  "details": "Detailed analysis (markdown format)",
   "confidence": 0.75,
-  "key_findings": ["発見1", "発見2"],
-  "agent_positions": {"田中太郎": "賛成 — 理由"},
-  "turning_points": ["転換点1"],
-  "consensus": "中 — 分かれた",
-  "minority_views": ["少数意見"],
-  "prediction": "予測テキスト",
+  "key_findings": ["Finding 1", "Finding 2"],
+  "agent_positions": {"John Smith": "for — reason"},
+  "turning_points": ["Turning point 1"],
+  "consensus": "Medium — divided",
+  "minority_views": ["Minority view"],
+  "prediction": "Prediction text",
   "consensus_score": 0.6,
-  "stance_distribution": {"賛成": 4, "反対": 3, "中立": 1},
+  "stance_distribution": {"for": 4, "against": 3, "neutral": 1},
   "activity_by_round": [15, 20, 18, 12]
 }
 ```
 
 ---
 
-## 質問機能
+## Ask Feature
 
 ### `POST /api/simulation/{id}/ask`
 
-エージェントに質問を送信（SSEレスポンス）。
+Send a question to agents (SSE response).
 
-**Request Body**: `{"question": "質問テキスト", "target_agents": ["agent_id1"]}`
+**Request Body**: `{"question": "Question text", "target_agents": ["agent_id1"]}`
 
 ### `GET /api/simulation/{id}/ask/history`
 
-質問と回答の履歴を取得。
+Get question and answer history.
 
 ---
 
-## ヘルスチェック
+## Health Check
 
 ### `GET /health`
 

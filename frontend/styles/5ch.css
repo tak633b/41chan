@@ -1,21 +1,6 @@
 /* ================================================
-   41chan — imageboard retro design
+   41chan — 4chan Yotsuba B Theme (faithful reproduction)
    ================================================ */
-
-:root {
-  --bg: #efefef;
-  --header-bg: #800000;
-  --header-text: #ffffff;
-  --link: #0000ee;
-  --link-visited: #551a8b;
-  --link-hover: #ff0000;
-  --border: #aaaaaa;
-  --post-bg: #ffffff;
-  --post-num: #dd4444;
-  --name-color: #008000;
-  --id-color: #888888;
-  --font-mono: "MS PGothic", "ＭＳ Ｐゴシック", "Osaka", monospace, sans-serif;
-}
 
 /* Base reset */
 * {
@@ -23,230 +8,296 @@
 }
 
 body {
-  background-color: var(--bg);
-  font-family: var(--font-mono);
-  font-size: 13px;
-  color: #222;
+  background-color: #eef2ff;
+  font-family: arial, helvetica, sans-serif;
+  font-size: 10pt;
+  color: #000;
   margin: 0;
   padding: 0;
-  line-height: 1.5;
+  line-height: normal;
 }
 
-/* ============ Header ============ */
-.ochch-header {
-  background-color: #98e;
-  color: #ffffff;
-  padding: 6px 12px;
-  font-size: 15px;
-  font-weight: bold;
-  border-bottom: 2px solid #76b;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.ochch-header a {
-  color: #ffffff;
-  text-decoration: none;
-}
-.ochch-header a:hover {
-  color: #fff;
+a {
+  color: #34345c;
   text-decoration: underline;
 }
-.ochch-site-title {
-  font-size: 18px;
-  letter-spacing: 0.05em;
+a:visited {
+  color: #0e0066;
+}
+a:hover {
+  color: #d00000;
+}
+
+/* ============ Board List Bar (top) ============ */
+.board-list-bar {
+  background: #d6daf0;
+  border-bottom: 1px solid #b7c5d9;
+  padding: 2px 8px;
+  font-size: 9pt;
+  font-family: arial, helvetica, sans-serif;
+}
+.board-list-bar a {
+  color: #34345c;
+  text-decoration: none;
+}
+.board-list-bar a:hover {
+  text-decoration: underline;
+  color: #d00000;
+}
+
+/* ============ Board Banner ============ */
+.board-banner {
+  text-align: center;
+  padding: 16px 0 8px;
+}
+.board-banner-title {
+  font-family: Tahoma, arial, helvetica, sans-serif;
+  font-size: 28px;
+  font-weight: bold;
+  color: #af0a0f;
+  letter-spacing: -1px;
+}
+.board-banner-subtitle {
+  font-family: Tahoma, arial, helvetica, sans-serif;
+  font-size: 11px;
+  color: #af0a0f;
+  margin-top: 2px;
 }
 
 /* ============ Navigation ============ */
 .ochch-nav {
-  background-color: #d6daf0;
+  background: #d6daf0;
   border-top: 1px solid #b7c5d9;
   border-bottom: 1px solid #b7c5d9;
-  padding: 4px 12px;
-  font-size: 12px;
+  padding: 3px 8px;
+  font-size: 9pt;
+  font-family: arial, helvetica, sans-serif;
 }
 .ochch-nav a {
-  color: var(--link);
+  color: #34345c;
   text-decoration: none;
-  margin-right: 8px;
+  margin-right: 4px;
 }
 .ochch-nav a:hover {
   text-decoration: underline;
-  color: var(--link-hover);
+  color: #d00000;
 }
 
 /* ============ Main content ============ */
 .ochch-main {
-  max-width: 900px;
-  margin: 0 auto;
-  padding: 8px 12px;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
 }
 
 .ochch-page-title {
-  font-size: 16px;
+  font-family: Tahoma, arial, helvetica, sans-serif;
+  font-size: 28px;
   font-weight: bold;
-  border-bottom: 2px solid var(--header-bg);
-  padding-bottom: 4px;
-  margin-bottom: 12px;
-  color: var(--header-bg);
+  color: #af0a0f;
+  text-align: center;
+  padding: 10px 0 6px;
+  margin-bottom: 4px;
 }
 
-/* ============ Board list ============ */
+/* ============ Board list (top page) ============ */
 .board-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 8px;
-  margin-top: 12px;
+  gap: 4px;
+  margin-top: 8px;
+  padding: 0 20px;
 }
 
 .board-card {
-  background: var(--post-bg);
-  border: 1px solid var(--border);
-  padding: 8px 10px;
+  background: #d6daf0;
+  border: 1px solid #b7c5d9;
+  padding: 6px 8px;
   cursor: pointer;
-  transition: background 0.1s;
+  transition: border-color 0.1s;
 }
 .board-card:hover {
-  background: #fff8f8;
-  border-color: var(--header-bg);
+  border-color: #34345c;
 }
 .board-card-title {
   font-weight: bold;
-  color: var(--link);
-  font-size: 14px;
+  color: #34345c;
+  font-size: 10pt;
 }
 .board-card-title:hover {
   text-decoration: underline;
-  color: var(--link-hover);
+  color: #d00000;
 }
 .board-card-desc {
-  font-size: 11px;
-  color: #666;
+  font-size: 9pt;
+  color: #555;
   margin-top: 2px;
 }
 .board-card-stats {
-  font-size: 11px;
-  color: var(--id-color);
-  margin-top: 4px;
+  font-size: 9pt;
+  color: #707070;
+  margin-top: 3px;
 }
 
-/* ============ Thread list ============ */
+/* ============ Thread list (board page) ============ */
 .thread-list {
   width: 100%;
   border-collapse: collapse;
   margin-top: 8px;
+  font-size: 10pt;
 }
 .thread-list th {
-  background: var(--header-bg);
-  color: var(--header-text);
+  background: #d6daf0;
+  color: #000;
   padding: 4px 8px;
-  font-size: 12px;
+  font-size: 9pt;
   text-align: left;
+  border: 1px solid #b7c5d9;
+  font-weight: bold;
 }
 .thread-list td {
   padding: 4px 8px;
-  border-bottom: 1px dotted var(--border);
-  font-size: 12px;
+  border-bottom: 1px solid #b7c5d9;
+  font-size: 10pt;
 }
 .thread-list tr:hover td {
-  background: #fff0f0;
+  background: #d6daf0;
 }
 .thread-list a {
-  color: var(--link);
+  color: #34345c;
   text-decoration: none;
 }
 .thread-list a:hover {
   text-decoration: underline;
-  color: var(--link-hover);
+  color: #d00000;
 }
 
 /* ============ Thread view ============ */
 .thread-header {
-  background: #ffeeee;
-  border: 1px solid var(--border);
+  background: #d6daf0;
+  border: 1px solid #b7c5d9;
+  border-left: none;
+  border-top: none;
   padding: 6px 10px;
-  margin-bottom: 6px;
-  font-size: 14px;
-  font-weight: bold;
+  margin-bottom: 8px;
+  font-size: 10pt;
+  font-weight: normal;
+  color: #000;
 }
 
 .posts-container {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
+  padding: 0 20px;
 }
 
+/* ============ Post item ============ */
+/* OP posts: transparent bg, inline display (4chan spec) */
 .post-item {
-  background: var(--post-bg);
-  border: 1px solid #ddd;
-  border-bottom: none;
-  padding: 4px 8px 6px;
+  background: transparent;
+  display: inline;
+  padding: 0;
+  margin: 0 0 4px;
 }
-.post-item:last-child {
-  border-bottom: 1px solid #ddd;
+
+/* Reply posts: Yotsuba B reply — display:table (4chan spec) */
+.post-item.post-reply {
+  background: #d6daf0;
+  border: 1px solid #b7c5d9;
+  border-left: none;
+  border-top: none;
+  display: table;
+  padding: 2px;
+  margin: 2px 0 4px;
 }
-.post-item:nth-child(even) {
-  background: #fafafa;
+
+/* Wrapper so OP inline + reply table both get vertical flow */
+.post-wrapper {
+  display: block;
+  margin-bottom: 4px;
 }
 
 .post-header {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  margin-bottom: 3px;
-  flex-wrap: wrap;
+  display: inline;
+  font-size: 10pt;
+  margin-bottom: 2px;
+}
+.post-header > span {
+  margin-right: 4px;
 }
 
 .post-num {
-  font-weight: bold;
-  color: var(--post-num);
-  font-size: 13px;
+  color: #000;
+  font-size: 10pt;
   cursor: pointer;
-  flex-shrink: 0;
+  font-weight: normal;
 }
-.post-num:hover {
+.post-num a {
+  color: #34345c;
+  text-decoration: none;
+}
+.post-num a:hover {
   text-decoration: underline;
 }
 
 .post-name {
-  color: var(--name-color);
-  font-weight: bold;
-  font-size: 13px;
-  cursor: pointer;
+  color: #800080;
+  font-weight: normal;
+  font-size: 10pt;
 }
-.post-name:hover {
-  text-decoration: underline;
+
+.post-tripcode {
+  color: #228854;
+  font-weight: normal;
+  font-size: 10pt;
 }
 
 .post-time {
-  color: var(--id-color);
-  font-size: 11px;
+  color: #000;
+  font-size: 10pt;
+  font-weight: normal;
 }
 
 .post-id {
-  color: var(--id-color);
-  font-size: 11px;
-}
-.post-id span {
-  color: #444;
+  font-size: 10pt;
+  font-weight: normal;
 }
 
 .post-body {
-  font-size: 13px;
-  line-height: 1.6;
-  word-break: break-all;
-  padding-left: 2px;
+  font-size: 10pt;
+  line-height: 1.5;
+  word-break: break-word;
+  padding-top: 4px;
+  padding-left: 0;
   white-space: pre-wrap;
 }
 
+/* Subject */
+.post-subject {
+  color: #000;
+  font-weight: normal;
+  font-size: 10pt;
+}
+
+/* File info */
+.post-file-info {
+  font-size: 9pt;
+  color: #707070;
+  margin-bottom: 3px;
+}
+
+/* Greentext */
+.greentext {
+  color: #789922;
+  font-weight: normal;
+}
+
+/* Anchor links (>>N) — quote links */
 .anchor-link {
-  color: #d00;
+  color: #34345c;
   cursor: pointer;
-  text-decoration: none;
+  text-decoration: underline;
 }
 .anchor-link:hover {
-  text-decoration: underline;
-  color: #ff0000;
+  color: #d00000;
 }
 
 /* Anchor popup — dark theme */
@@ -259,20 +310,20 @@ body {
   max-width: 400px;
   z-index: 100;
   box-shadow: 2px 2px 8px rgba(0,0,0,0.5);
-  font-size: 12px;
+  font-size: 10pt;
   pointer-events: none;
 }
 
 /* ============ Progress bar ============ */
 .progress-bar-container {
-  background: #ddd;
-  border: 1px solid var(--border);
+  background: #d6daf0;
+  border: 1px solid #b7c5d9;
   height: 16px;
   margin: 8px 0;
   position: relative;
 }
 .progress-bar-fill {
-  background: var(--header-bg);
+  background: #af0a0f;
   height: 100%;
   transition: width 0.5s ease;
 }
@@ -281,7 +332,7 @@ body {
   top: 0;
   left: 50%;
   transform: translateX(-50%);
-  font-size: 11px;
+  font-size: 9pt;
   color: #fff;
   mix-blend-mode: difference;
   line-height: 16px;
@@ -292,39 +343,41 @@ body {
 .status-badge {
   display: inline-block;
   padding: 1px 6px;
-  font-size: 11px;
-  border-radius: 2px;
+  font-size: 9pt;
+  border-radius: 0;
+  font-family: arial, helvetica, sans-serif;
 }
-.status-completed { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
-.status-simulating { background: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
-.status-failed { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
-.status-paused { background: #ffc107; color: #333; border: 1px solid #e0a800; }
+.status-completed { background: #d6daf0; color: #117743; border: 1px solid #b7c5d9; }
+.status-simulating { background: #d6daf0; color: #af0a0f; border: 1px solid #b7c5d9; }
+.status-failed { background: #d6daf0; color: #d00000; border: 1px solid #b7c5d9; }
+.status-paused { background: #d6daf0; color: #34345c; border: 1px solid #b7c5d9; }
 .status-initializing, .status-extracting, .status-generating_agents,
 .status-generating_boards, .status-reporting, .status-planning {
-  background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb;
+  background: #d6daf0; color: #34345c; border: 1px solid #b7c5d9;
 }
 
 /* ============ Forms ============ */
 .ochch-form {
-  background: var(--post-bg);
-  border: 1px solid var(--border);
+  background: #d6daf0;
+  border: 1px solid #b7c5d9;
   padding: 12px;
-  margin: 8px 0;
+  margin: 8px 20px;
 }
 .ochch-form label {
   display: block;
   font-weight: bold;
   margin-bottom: 4px;
-  font-size: 13px;
+  font-size: 10pt;
 }
 .ochch-form input[type="text"],
+.ochch-form input[type="url"],
 .ochch-form textarea,
 .ochch-form select {
   width: 100%;
-  border: 1px solid var(--border);
+  border: 1px solid #b7c5d9;
   padding: 4px 6px;
-  font-family: var(--font-mono);
-  font-size: 13px;
+  font-family: arial, helvetica, sans-serif;
+  font-size: 10pt;
   background: #fff;
 }
 .ochch-form textarea {
@@ -335,88 +388,115 @@ body {
   margin-bottom: 10px;
 }
 .ochch-btn {
-  background: var(--header-bg);
-  color: #fff;
-  border: none;
-  padding: 6px 14px;
-  font-size: 13px;
-  font-family: var(--font-mono);
+  background: #d6daf0;
+  color: #000;
+  border: 1px solid #b7c5d9;
+  padding: 4px 12px;
+  font-size: 10pt;
+  font-family: arial, helvetica, sans-serif;
   cursor: pointer;
 }
 .ochch-btn:hover {
-  background: #600000;
+  background: #c5c9e0;
 }
 .ochch-btn:disabled {
-  background: #999;
+  color: #999;
+  cursor: not-allowed;
+}
+.ochch-btn-primary {
+  background: #800000;
+  color: #fff;
+  border: 1px solid #600;
+  padding: 8px 24px;
+  font-size: 12pt;
+  font-weight: bold;
+  font-family: arial, helvetica, sans-serif;
+  cursor: pointer;
+  margin-top: 8px;
+}
+.ochch-btn-primary:hover {
+  background: #a00000;
+}
+.ochch-btn-primary:disabled {
+  background: #997777;
+  color: #ccc;
   cursor: not-allowed;
 }
 .ochch-btn-secondary {
-  background: #555;
+  background: #d6daf0;
+  color: #34345c;
 }
 .ochch-btn-secondary:hover {
-  background: #333;
+  background: #c5c9e0;
 }
 
-/* ============ Simulation list ============ */
+/* ============ Simulation list (top page table) ============ */
 .sim-list {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: 10pt;
+  margin: 0 auto;
 }
 .sim-list th {
-  background: var(--header-bg);
-  color: #fff;
-  padding: 5px 8px;
+  background: #d6daf0;
+  color: #000;
+  padding: 4px 8px;
   text-align: left;
+  border: 1px solid #b7c5d9;
+  font-weight: bold;
+  font-size: 9pt;
 }
 .sim-list td {
-  padding: 5px 8px;
-  border-bottom: 1px dotted var(--border);
+  padding: 4px 8px;
+  border-bottom: 1px solid #b7c5d9;
 }
 .sim-list tr:hover td {
-  background: #fff0f0;
+  background: #d6daf0;
 }
 .sim-list a {
-  color: var(--link);
+  color: #34345c;
   text-decoration: none;
 }
 .sim-list a:hover {
   text-decoration: underline;
-  color: var(--link-hover);
+  color: #d00000;
 }
 
 /* ============ Report ============ */
 .report-section {
   margin-bottom: 16px;
+  padding: 0 20px;
 }
 .report-section h2 {
-  font-size: 14px;
+  font-size: 10pt;
   font-weight: bold;
-  border-left: 3px solid var(--header-bg);
+  border-left: 3px solid #af0a0f;
   padding-left: 6px;
   margin-bottom: 6px;
+  color: #af0a0f;
 }
 .report-box {
-  background: var(--post-bg);
-  border: 1px solid var(--border);
+  background: #d6daf0;
+  border: 1px solid #b7c5d9;
   padding: 8px 10px;
-  font-size: 13px;
+  font-size: 10pt;
   line-height: 1.6;
 }
 
-/* Markdown rendering styles */
+/* Markdown rendering */
 .report-markdown h1,
 .report-markdown h2,
 .report-markdown h3,
 .report-markdown h4 {
   font-weight: bold;
   margin: 10px 0 4px;
-  border-left: 3px solid var(--header-bg);
+  border-left: 3px solid #af0a0f;
   padding-left: 6px;
+  color: #af0a0f;
 }
-.report-markdown h1 { font-size: 15px; }
-.report-markdown h2 { font-size: 14px; }
-.report-markdown h3 { font-size: 13px; }
+.report-markdown h1 { font-size: 12pt; }
+.report-markdown h2 { font-size: 11pt; }
+.report-markdown h3 { font-size: 10pt; }
 .report-markdown p {
   margin: 4px 0;
   line-height: 1.7;
@@ -431,78 +511,79 @@ body {
 }
 .report-markdown strong {
   font-weight: bold;
-  color: #333;
+  color: #000;
 }
 .report-markdown em {
   font-style: italic;
   color: #555;
 }
 .report-markdown code {
-  background: #f0f0f0;
-  border: 1px solid #ddd;
+  background: #d6daf0;
+  border: 1px solid #b7c5d9;
   padding: 1px 4px;
-  font-size: 12px;
+  font-size: 9pt;
   font-family: monospace;
 }
 .report-markdown pre {
-  background: #f5f5f5;
-  border: 1px solid #ddd;
+  background: #d6daf0;
+  border: 1px solid #b7c5d9;
   padding: 8px;
   overflow-x: auto;
-  font-size: 12px;
+  font-size: 9pt;
 }
 .report-markdown blockquote {
-  border-left: 3px solid #aaa;
+  border-left: 3px solid #b7c5d9;
   margin: 4px 0;
   padding-left: 8px;
-  color: #666;
+  color: #789922;
 }
 .report-markdown hr {
   border: none;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid #b7c5d9;
   margin: 8px 0;
 }
 .report-markdown table {
   border-collapse: collapse;
   width: 100%;
-  font-size: 12px;
+  font-size: 9pt;
   margin: 8px 0;
 }
 .report-markdown th {
-  background: var(--header-bg);
-  color: #fff;
+  background: #d6daf0;
+  color: #000;
   padding: 4px 8px;
   text-align: left;
+  border: 1px solid #b7c5d9;
 }
 .report-markdown td {
   padding: 4px 8px;
-  border-bottom: 1px dotted var(--border);
+  border: 1px solid #b7c5d9;
 }
 
 .confidence-meter {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: 10pt;
 }
 .confidence-bar {
   width: 100px;
   height: 10px;
-  background: #ddd;
-  border: 1px solid var(--border);
+  background: #d6daf0;
+  border: 1px solid #b7c5d9;
   display: inline-block;
   position: relative;
 }
 .confidence-fill {
   display: block;
   height: 100%;
-  background: var(--header-bg);
+  background: #af0a0f;
 }
 
 /* ============ Report graph ============ */
 .chart-container {
-  background: var(--post-bg);
-  border: 1px solid var(--border);
+  background: #d6daf0;
+  border: 1px solid #b7c5d9;
   padding: 10px 12px;
 }
 .chart-row {
@@ -510,7 +591,7 @@ body {
   align-items: center;
   gap: 8px;
   margin-bottom: 6px;
-  font-size: 12px;
+  font-size: 9pt;
 }
 .chart-label {
   width: 60px;
@@ -520,8 +601,8 @@ body {
 }
 .chart-bar-bg {
   flex: 1;
-  background: #e0e0e0;
-  border: 1px solid #ccc;
+  background: #eef2ff;
+  border: 1px solid #b7c5d9;
   height: 16px;
   position: relative;
 }
@@ -534,13 +615,13 @@ body {
   width: 80px;
   flex-shrink: 0;
   color: #555;
-  font-size: 11px;
+  font-size: 9pt;
 }
 .consensus-meter {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: 10pt;
 }
 .consensus-dots {
   display: inline-flex;
@@ -551,37 +632,35 @@ body {
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  border: 1px solid #999;
+  border: 1px solid #b7c5d9;
 }
 .consensus-dot.filled {
-  background: var(--header-bg);
-  border-color: var(--header-bg);
+  background: #af0a0f;
+  border-color: #af0a0f;
 }
 .consensus-dot.empty {
-  background: #ddd;
+  background: #d6daf0;
 }
 .citation-link {
-  color: #0000FF;
+  color: #d00000;
   text-decoration: none;
-  font-size: 11px;
+  font-size: 9pt;
 }
 .citation-link:hover {
   text-decoration: underline;
-  color: #ff0000;
 }
 .report-theme-title {
-  font-size: 15px;
+  font-size: 12pt;
   font-weight: bold;
-  color: #333;
+  color: #af0a0f;
   margin-bottom: 4px;
   padding: 6px 10px;
-  background: #fff8f8;
-  border: 1px solid #ddd;
-  border-left: 4px solid var(--header-bg);
+  background: #d6daf0;
+  border: 1px solid #b7c5d9;
 }
 .report-theme-divider {
-  color: #800000;
-  font-size: 12px;
+  color: #af0a0f;
+  font-size: 9pt;
   letter-spacing: -1px;
   margin: 2px 0 8px 0;
 }
@@ -597,8 +676,8 @@ body {
   justify-content: center;
 }
 .modal-content {
-  background: var(--bg);
-  border: 2px solid var(--header-bg);
+  background: #eef2ff;
+  border: 2px solid #b7c5d9;
   padding: 16px;
   max-width: 500px;
   width: 90%;
@@ -606,11 +685,11 @@ body {
   overflow-y: auto;
 }
 .modal-title {
-  font-size: 16px;
+  font-size: 12pt;
   font-weight: bold;
-  color: var(--header-bg);
+  color: #af0a0f;
   margin-bottom: 8px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid #b7c5d9;
   padding-bottom: 4px;
 }
 .modal-close {
@@ -619,36 +698,36 @@ body {
   border: none;
   font-size: 18px;
   cursor: pointer;
-  color: #888;
+  color: #34345c;
 }
 .persona-field {
   margin-bottom: 6px;
-  font-size: 12px;
+  font-size: 10pt;
 }
 .persona-field strong {
-  color: var(--header-bg);
+  color: #000;
 }
 
 /* ============ Ask thread ============ */
 .ask-form {
-  background: var(--post-bg);
-  border: 1px solid var(--border);
+  background: #d6daf0;
+  border: 1px solid #b7c5d9;
   padding: 8px 10px;
   margin-bottom: 12px;
 }
 .ask-answer {
-  background: #fffff8;
-  border: 1px solid #ddd;
+  background: #eef2ff;
+  border: 1px solid #b7c5d9;
   border-bottom: none;
   padding: 4px 8px 6px;
 }
 .ask-answer:last-child {
-  border-bottom: 1px solid #ddd;
+  border-bottom: 1px solid #b7c5d9;
 }
 .typing-indicator {
-  color: var(--id-color);
+  color: #707070;
   font-style: italic;
-  font-size: 12px;
+  font-size: 9pt;
   padding: 4px 8px;
 }
 
@@ -664,60 +743,25 @@ body {
   75%  { content: '...'; }
 }
 
-/* ============ Responsive ============ */
-@media (max-width: 600px) {
-  .ochch-main { padding: 4px 6px; }
-  .board-grid { grid-template-columns: 1fr; }
-  .post-header { font-size: 12px; }
-}
-
-/* ============ Real-time effects ============ */
-@keyframes postSlideIn {
-  from { opacity: 0; transform: translateY(-6px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-.post-new {
-  animation: postSlideIn 0.35s ease-out;
-  background: #fffde7 !important;
-  transition: background 2s ease;
-}
-
-.post-thinking-placeholder {
-  opacity: 0.6;
-  border-left: 3px solid #aaa;
-}
-@keyframes dotBlink {
-  0%,100% { opacity: 1; }
-  50%      { opacity: 0.2; }
-}
-.dot-anim {
-  animation: dotBlink 1s ease-in-out infinite;
-}
-
-
-/* ============================================================
-   BATTLE HEADER — imageboard "Anons in this thread" bar
-   ============================================================ */
-
+/* ============ Battle header ============ */
 .battle-header {
   width: 100%;
-  background-color: #f0e0e0;
-  border-top: 1px solid #aaaaaa;
-  border-bottom: 1px solid #aaaaaa;
+  background-color: #d6daf0;
+  border-top: 1px solid #b7c5d9;
+  border-bottom: 1px solid #b7c5d9;
   padding: 4px 8px 6px;
   margin-bottom: 8px;
-  font-family: var(--font-mono);
+  font-family: arial, helvetica, sans-serif;
   overflow: hidden;
 }
 
 .battle-header-label {
-  font-size: 10px;
-  color: #666;
+  font-size: 9pt;
+  color: #707070;
   margin-bottom: 4px;
   user-select: none;
 }
 
-/* Anon icon list */
 .battle-residents {
   display: flex;
   flex-wrap: wrap;
@@ -726,12 +770,11 @@ body {
 }
 
 .resident-empty {
-  font-size: 11px;
-  color: #888;
-  font-family: var(--font-mono);
+  font-size: 9pt;
+  color: #707070;
+  font-family: arial, helvetica, sans-serif;
 }
 
-/* Individual anon icon */
 .resident-icon {
   display: flex;
   flex-direction: column;
@@ -740,25 +783,24 @@ body {
   border: 1px solid transparent;
   padding: 2px 4px;
   cursor: pointer;
-  font-family: var(--font-mono);
-  border-radius: 2px;
+  font-family: arial, helvetica, sans-serif;
+  border-radius: 0;
   line-height: 1;
   transition: border-color 0.1s;
 }
 
 .resident-icon:hover {
-  border-color: #aaaaaa;
+  border-color: #b7c5d9;
   background-color: rgba(255,255,255,0.5);
 }
 
 .resident-face {
   font-size: 14px;
   display: block;
-  font-family: var(--font-mono);
 }
 
 .resident-name {
-  font-size: 10px;
+  font-size: 9pt;
   color: #555;
   margin-top: 1px;
   display: block;
@@ -766,32 +808,35 @@ body {
 
 /* ============ Catalog view ============ */
 .catalog-nav {
-  font-size: 12px;
-  padding: 4px 0;
+  font-size: 9pt;
+  padding: 3px 8px;
   margin-bottom: 4px;
+  background: #d6daf0;
+  border-bottom: 1px solid #b7c5d9;
 }
 .catalog-nav a {
-  color: #0000ee;
+  color: #34345c;
   text-decoration: none;
 }
 .catalog-nav a:hover {
   text-decoration: underline;
-  color: #ff0000;
+  color: #d00000;
 }
 
 .catalog-title {
-  font-size: 20px;
+  font-family: Tahoma, arial, helvetica, sans-serif;
+  font-size: 28px;
   font-weight: bold;
   text-align: center;
-  color: #800000;
+  color: #af0a0f;
   margin: 8px 0;
 }
 
 .catalog-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  grid-template-columns: repeat(5, 1fr);
   gap: 4px;
-  padding: 4px;
+  padding: 4px 20px;
 }
 
 .catalog-card {
@@ -800,23 +845,23 @@ body {
   background: #d6daf0;
   border: 1px solid #b7c5d9;
   text-decoration: none;
-  color: #222;
+  color: #000;
   overflow: hidden;
   cursor: pointer;
   transition: border-color 0.1s;
 }
 .catalog-card:hover {
-  border-color: #98e;
+  border-color: #34345c;
 }
 
 .catalog-thumb {
   width: 100%;
-  height: 150px;
+  height: 120px;
   background: #c4c8e0;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
+  font-size: 10pt;
   color: #555;
   font-weight: bold;
   overflow: hidden;
@@ -829,20 +874,20 @@ body {
 }
 
 .catalog-card-info {
-  padding: 4px 6px;
-  font-size: 11px;
+  padding: 3px 5px;
+  font-size: 9pt;
 }
 
 .catalog-card-stats {
   color: #707070;
-  font-size: 10px;
+  font-size: 9pt;
   margin-bottom: 2px;
 }
 
 .catalog-card-title {
-  font-weight: bold;
-  font-size: 11px;
-  color: #222;
+  font-weight: normal;
+  font-size: 9pt;
+  color: #000;
   line-height: 1.3;
   margin-bottom: 2px;
   overflow: hidden;
@@ -852,7 +897,7 @@ body {
 }
 
 .catalog-card-snippet {
-  font-size: 10px;
+  font-size: 9pt;
   color: #555;
   line-height: 1.3;
   overflow: hidden;
@@ -861,16 +906,33 @@ body {
   -webkit-box-orient: vertical;
 }
 
-/* Post subject & file info */
-.post-subject {
-  color: #cc1105;
-  font-weight: bold;
-  font-size: 14px;
-  margin-bottom: 2px;
+/* ============ Responsive ============ */
+@media (max-width: 600px) {
+  .ochch-main { padding: 0; }
+  .board-grid { grid-template-columns: 1fr; padding: 0 4px; }
+  .catalog-grid { grid-template-columns: repeat(3, 1fr); padding: 0 4px; }
+  .posts-container { padding: 0 4px; }
 }
 
-.post-file-info {
-  font-size: 11px;
-  color: #707070;
-  margin-bottom: 3px;
+/* ============ Real-time effects ============ */
+@keyframes postSlideIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.post-new {
+  animation: postSlideIn 0.35s ease-out;
+  border-left: 2px solid #d00000 !important;
+  transition: border-color 2s ease;
+}
+
+.post-thinking-placeholder {
+  opacity: 0.6;
+  border-left: 3px solid #b7c5d9;
+}
+@keyframes dotBlink {
+  0%,100% { opacity: 1; }
+  50%      { opacity: 0.2; }
+}
+.dot-anim {
+  animation: dotBlink 1s ease-in-out infinite;
 }

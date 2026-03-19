@@ -1,50 +1,50 @@
-# コントリビューションガイド / Contributing Guide
+# Contributing Guide
 
-41ch へのコントリビューションに感謝します！🎌
+Thanks for contributing to 41chan! 🎉
 
-## Issue
+## Issues
 
-- **バグ報告**: [Bug Report テンプレート](.github/ISSUE_TEMPLATE/bug_report.md) を使ってください
-- **機能提案**: [Feature Request テンプレート](.github/ISSUE_TEMPLATE/feature_request.md) を使ってください
-- 日本語・英語どちらでもOKです
+- **Bug Reports**: Please use the [Bug Report template](.github/ISSUE_TEMPLATE/bug_report.md)
+- **Feature Requests**: Please use the [Feature Request template](.github/ISSUE_TEMPLATE/feature_request.md)
+- Issues in English are welcome.
 
-## Pull Request
+## Pull Requests
 
-1. リポジトリをフォーク
-2. ブランチを作成: `git checkout -b feature/your-feature`
-3. 変更をコミット: `git commit -m "feat: add something"`
-4. プッシュ: `git push origin feature/your-feature`
-5. Pull Request を作成
+1. Fork the repository
+2. Create a branch: `git checkout -b feature/your-feature`
+3. Commit your changes: `git commit -m "feat: add something"`
+4. Push: `git push origin feature/your-feature`
+5. Open a Pull Request
 
-### ブランチ命名規則
+### Branch Naming Convention
 
-| プレフィックス | 用途 |
+| Prefix | Purpose |
 |------------|------|
-| `feature/` | 新機能 |
-| `fix/` | バグ修正 |
-| `docs/` | ドキュメント |
-| `refactor/` | リファクタリング |
-| `chore/` | 雑務（依存関係更新など） |
+| `feature/` | New features |
+| `fix/` | Bug fixes |
+| `docs/` | Documentation |
+| `refactor/` | Refactoring |
+| `chore/` | Maintenance (dependency updates, etc.) |
 
-### コミットメッセージ
+### Commit Messages
 
-[Conventional Commits](https://www.conventionalcommits.org/) に従ってください:
+Please follow [Conventional Commits](https://www.conventionalcommits.org/):
 
 ```
-feat: 新機能の説明
-fix: バグ修正の説明
-docs: ドキュメント変更
-refactor: リファクタリング
-chore: 雑務
+feat: description of new feature
+fix: description of bug fix
+docs: documentation changes
+refactor: refactoring
+chore: maintenance
 ```
 
-## コードスタイル
+## Code Style
 
-### Python（backend/）
+### Python (backend/)
 
-- フォーマッター: [black](https://github.com/psf/black)
-- リンター: [ruff](https://github.com/astral-sh/ruff)
-- 型ヒント推奨
+- Formatter: [black](https://github.com/psf/black)
+- Linter: [ruff](https://github.com/astral-sh/ruff)
+- Type hints recommended
 
 ```bash
 cd backend
@@ -53,53 +53,53 @@ black .
 ruff check .
 ```
 
-### TypeScript（frontend/）
+### TypeScript (frontend/)
 
-- フォーマッター: [Prettier](https://prettier.io/)
-- リンター: ESLint（Next.js設定）
+- Formatter: [Prettier](https://prettier.io/)
+- Linter: ESLint (Next.js config)
 
 ```bash
 cd frontend
 npm run lint
 ```
 
-## LLMバックエンドのテスト
+## Testing LLM Backends
 
-### Ollama（ローカル）でテスト
+### Testing with Ollama (local)
 
 ```bash
-# Ollamaを起動
+# Start Ollama
 export OLLAMA_NUM_PARALLEL=4
 ollama serve
 
-# モデルをダウンロード
+# Download a model
 ollama pull qwen3.5:9b
 
-# .envをollama設定にして起動
-ORACLE_LLM_BACKEND=ollama venv/bin/uvicorn main:app --reload --port 8000
+# Start with Ollama backend
+ORACLE_LLM_BACKEND=ollama venv/bin/uvicorn main:app --reload --port 8001
 ```
 
-### ZAI/OpenRouter でテスト
+### Testing with ZAI/OpenRouter
 
 ```bash
-# .env にAPIキーを設定してから
-ORACLE_LLM_BACKEND=zai venv/bin/uvicorn main:app --reload --port 8000
+# Set your API key in .env, then:
+ORACLE_LLM_BACKEND=zai venv/bin/uvicorn main:app --reload --port 8001
 ```
 
-### テスト用シミュレーション
+### Test Simulations
 
-- フロントエンドで「ミニ」スケールを選択（エージェント5人、API消費が少ない）
-- シンプルなテーマで試す（例: 「AIと教育の未来」）
+- Select "mini" scale in the frontend (5 agents, lower API usage)
+- Try a simple theme (e.g., "The future of AI and education")
 
-## ディレクトリ構成
+## Directory Structure
 
-- `backend/core/` — コアロジック（LLM・エージェント生成・シミュレーション）
-- `backend/api/` — FastAPI ルーター
-- `backend/services/` — ビジネスロジック
-- `frontend/app/` — Next.js ページ
-- `frontend/components/` — React コンポーネント
-- `docs/` — ドキュメント
+- `backend/core/` — Core logic (LLM, agent generation, simulation)
+- `backend/api/` — FastAPI routers
+- `backend/services/` — Business logic
+- `frontend/app/` — Next.js pages
+- `frontend/components/` — React components
+- `docs/` — Documentation
 
-## 質問・相談
+## Questions
 
-Issue で気軽に聞いてください。日本語・英語どちらでも対応します。
+Feel free to open an issue if you have any questions.

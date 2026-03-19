@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, use } from "react";
 import Link from "next/link";
-import { api, ThreadDetail, PostInfo, AgentInfo } from "@/lib/api";
+import { api, ThreadDetail, PostInfo, AgentInfo, SimulationStatus } from "@/lib/api";
 import PostCard from "@/components/PostCard";
 import PersonaModal from "@/components/PersonaModal";
 import BattleHeader from "@/components/BattleHeader";
@@ -24,10 +24,10 @@ export default function ThreadPage({
   const [sseActive, setSseActive] = useState(false);
   const [newPostIds, setNewPostIds] = useState<Set<string>>(new Set());
   const [thinkingPosts, setThinkingPosts] = useState<Map<string, { agent_name: string; username: string; post_num: number }>>(new Map());
+  const [ogImage, setOgImage] = useState<string>("");
   const bottomRef = useRef<HTMLDivElement>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
 
-  // Fetch thread data
   const loadThread = async () => {
     try {
       const t = await api.getThread(simId, threadId);
@@ -40,7 +40,6 @@ export default function ThreadPage({
     }
   };
 
-  // Fetch agents
   const loadAgents = async () => {
     try {
       const data = await api.getAgents(simId);
@@ -48,7 +47,15 @@ export default function ThreadPage({
     } catch {}
   };
 
-  // SSE connection
+  const loadSimStatus = async () => {
+    try {
+      const status = await api.getStatus(simId);
+      if (status.seed_info?.og_image) {
+        setOgImage(status.seed_info.og_image);
+      }
+    } catch {}
+  };
+
   const connectSSE = () => {
     if (eventSourceRef.current) return;
 
@@ -77,20 +84,17 @@ export default function ThreadPage({
       try {
         const d = JSON.parse(e.data);
         if (d.thread_id === threadId) {
-          // Remove matching entry from thinkingPosts
           setThinkingPosts((prev) => {
             const next = new Map(prev);
             next.delete(String(d.post?.post_num));
             return next;
           });
           setPosts((prev) => {
-            // Duplicate check
             if (prev.find((p) => p.post_id === d.post?.post_id)) {
               return prev;
             }
             return [...prev, d.post];
           });
-          // Set new post flag → clear after 2 seconds
           const postId: string = d.post?.post_id;
           if (postId) {
             setNewPostIds((prev) => new Set(prev).add(postId));
@@ -102,7 +106,6 @@ export default function ThreadPage({
               });
             }, 2000);
           }
-          // Auto-scroll
           setTimeout(
             () => bottomRef.current?.scrollIntoView({ behavior: "smooth" }),
             100
@@ -133,6 +136,7 @@ export default function ThreadPage({
   useEffect(() => {
     loadThread();
     loadAgents();
+    loadSimStatus();
     connectSSE();
 
     return () => {
@@ -148,7 +152,7 @@ export default function ThreadPage({
 
   if (loading) {
     return (
-      <div style={{ padding: 20, color: "#888" }}>
+      <div style={{ padding: 20, color: "#707070" }}>
         Loading<span className="loading-dots" />
       </div>
     );
@@ -158,33 +162,37 @@ export default function ThreadPage({
     return (
       <div
         style={{
-          background: "#f8d7da",
-          border: "1px solid #f5c6cb",
+          background: "#d6daf0",
+          border: "1px solid #b7c5d9",
           padding: "8px 12px",
-          color: "#721c24",
+          color: "#d00000",
+          fontSize: "9pt",
         }}
       >
-        ⚠️ {error}
+        {error}
       </div>
     );
   }
 
   return (
-    <div>
+    <div style={{ padding: "0 20px" }}>
+      {/* Navigation */}
       <div className="ochch-nav" style={{ marginBottom: 6 }}>
-        <Link href="/">TOP</Link>
-        <Link href={`/sim/${simId}`}>Simulation</Link>
+        [<Link href="/">Home</Link>]{" "}
+        [<Link href={`/sim/${simId}`}>Simulation</Link>]{" "}
         {thread?.board_id && (
-          <Link href={`/sim/${simId}/board/${thread.board_id}`}>
-            {thread?.board_name}
-          </Link>
+          <>
+            [<Link href={`/sim/${simId}/board/${thread.board_id}`}>
+              {thread?.board_name}
+            </Link>]{" "}
+          </>
         )}
-        <span style={{ color: "#888" }}>▶ Thread</span>
       </div>
 
+      {/* Thread title */}
       <div className="thread-header">
         {thread?.title}
-        <span style={{ fontSize: 11, color: "#888", marginLeft: 8 }}>
+        <span style={{ fontSize: "9pt", color: "#707070", marginLeft: 8, fontWeight: "normal" }}>
           ({thread?.board_name})
         </span>
       </div>
@@ -199,27 +207,28 @@ export default function ThreadPage({
       {sseActive && (
         <div
           style={{
-            fontSize: 11,
-            color: "#0c5460",
-            background: "#d1ecf1",
-            border: "1px solid #bee5eb",
+            fontSize: "9pt",
+            color: "#117743",
+            background: "#d6daf0",
+            border: "1px solid #b7c5d9",
             padding: "3px 8px",
             marginBottom: 6,
           }}
         >
-          ⚡ Real-time updates active...
+          Real-time updates active
         </div>
       )}
 
-      <div className="posts-container">
+      <div className="posts-container" style={{ padding: 0 }}>
         {posts.length === 0 ? (
           <div
             style={{
               padding: 16,
-              background: "#fff",
-              border: "1px solid #ddd",
-              color: "#888",
+              background: "#d6daf0",
+              border: "1px solid #b7c5d9",
+              color: "#707070",
               textAlign: "center",
+              fontSize: "9pt",
             }}
           >
             No posts yet
@@ -234,23 +243,38 @@ export default function ThreadPage({
               isNew={newPostIds.has(p.post_id)}
               isFirstPost={idx === 0}
               threadTitle={thread?.title}
+              ogImage={idx === 0 ? ogImage : undefined}
             />
           ))
         )}
         {Array.from(thinkingPosts.values()).map((t) => (
-          <div key={`thinking-${t.post_num}`} className="post-item post-thinking-placeholder">
+          <div key={`thinking-${t.post_num}`} className="post-item post-reply post-thinking-placeholder">
             <div className="post-header">
-              <span className="post-num">{t.post_num}</span>
-              <span className="post-name" style={{ color: "#800000" }}>{t.username}</span>
+              <span className="post-name">{t.username}</span>{" "}
+              <span className="post-num">No.{t.post_num}</span>
             </div>
-            <div className="post-body thinking-dots">Posting<span className="dot-anim">...</span></div>
+            <div className="post-body">Posting<span className="dot-anim">...</span></div>
           </div>
         ))}
         <div ref={bottomRef} />
       </div>
 
-      <div style={{ margin: "8px 0", fontSize: 12, color: "#888" }}>
+      <div style={{ margin: "8px 0", fontSize: "9pt", color: "#707070" }}>
         Total posts: {posts.length}
+      </div>
+
+      {/* Bottom navigation */}
+      <div className="ochch-nav">
+        [<Link href="/">Home</Link>]{" "}
+        [<Link href={`/sim/${simId}`}>Simulation</Link>]{" "}
+        {thread?.board_id && (
+          <>
+            [<Link href={`/sim/${simId}/board/${thread.board_id}`}>
+              {thread?.board_name}
+            </Link>]{" "}
+          </>
+        )}
+        [<a href="#top">Top</a>]
       </div>
 
       <PersonaModal

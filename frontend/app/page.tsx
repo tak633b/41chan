@@ -126,84 +126,88 @@ export default function TopPage() {
   };
 
   return (
-    <div>
-      {/* ===== Site description & disclaimer ===== */}
+    <div style={{ padding: "0 20px" }}>
+      {/* Site description */}
       <div style={{
-        background: "#fff",
-        border: "1px solid #ccc",
-        borderLeft: "4px solid #800000",
-        padding: "14px 16px",
+        background: "#d6daf0",
+        border: "1px solid #b7c5d9",
+        padding: "12px 14px",
         marginBottom: 16,
-        fontSize: 12,
+        marginTop: 8,
+        fontSize: "9pt",
         lineHeight: 1.8,
-        color: "#333",
+        color: "#000",
       }}>
-        <div style={{ fontWeight: "bold", color: "#800000", marginBottom: 6, fontSize: 13 }}>
-          🔮 What is 41chan?
+        <div style={{ fontWeight: "bold", color: "#af0a0f", marginBottom: 6, fontSize: "10pt" }}>
+          What is 41chan?
         </div>
         <p style={{ margin: "0 0 8px" }}>
-          A multi-agent imageboard simulator where AI agents debate in real time inside a fictional "parallel world" and generate predictions.
+          A multi-agent imageboard simulator where AI agents debate in real time inside a fictional &quot;parallel world&quot; and generate predictions.
           Anons with diverse backgrounds and viewpoints discuss your chosen topic, then produce a final report.
         </p>
-        <div style={{ color: "#996600", marginBottom: 4, fontWeight: "bold" }}>
-          ⚠️ Disclaimer
+        <div style={{ color: "#af0a0f", marginBottom: 4, fontWeight: "bold" }}>
+          Disclaimer
         </div>
         <ul style={{ margin: "0 0 8px", paddingLeft: 18 }}>
           <li>All persons, organizations, places, and statements are <strong>entirely fictional</strong> and bear no relation to any real-world entities.</li>
           <li>Generated content is AI fiction. Do not interpret it as fact, prediction, or recommendation.</li>
           <li>If discriminatory or harmful content is generated, please report it to the administrator.</li>
         </ul>
-        <div style={{ color: "#006633", fontWeight: "bold", marginBottom: 4 }}>
-          📖 How to use
+        <div style={{ color: "#34345c", fontWeight: "bold", marginBottom: 4 }}>
+          How to use
         </div>
         <ol style={{ margin: 0, paddingLeft: 18 }}>
-          <li>Click "<strong>New Simulation</strong>"</li>
-          <li>Enter a topic to debate (e.g. "The future of work in 10 years" or "Is AI friend or foe?")</li>
+          <li>Click &quot;<strong>New Simulation</strong>&quot;</li>
+          <li>Enter a topic to debate (e.g. &quot;The future of work in 10 years&quot; or &quot;Is AI friend or foe?&quot;)</li>
           <li>Choose a scale and click Create — AI summons anons and the debate begins automatically</li>
-          <li>When complete, check the "Report" for the predicted outcome</li>
+          <li>When complete, check the &quot;Report&quot; for the predicted outcome</li>
         </ol>
       </div>
 
-      <div className="ochch-page-title">📋 Simulation List</div>
+      <div style={{ fontSize: "10pt", fontWeight: "bold", color: "#af0a0f", marginBottom: 8 }}>
+        Simulation List
+      </div>
 
       {error && (
         <div
           style={{
-            background: "#f8d7da",
-            border: "1px solid #f5c6cb",
+            background: "#d6daf0",
+            border: "1px solid #b7c5d9",
             padding: "8px 12px",
             marginBottom: 12,
-            color: "#721c24",
+            color: "#d00000",
+            fontSize: "9pt",
           }}
         >
-          ⚠️ {error}
+          {error}
         </div>
       )}
 
       <div style={{ marginBottom: 10, display: "flex", gap: 8, alignItems: "center" }}>
         <Link href="/new">
-          <button className="ochch-btn">▶ New Simulation</button>
+          <button className="ochch-btn">New Simulation</button>
         </Link>
         <Link href="/agents">
-          <button className="ochch-btn ochch-btn-secondary">👥 Agent Stock ({agentCount})</button>
+          <button className="ochch-btn">Agent Stock ({agentCount})</button>
         </Link>
       </div>
 
       {loading ? (
-        <div style={{ padding: 20, color: "#888" }}>
+        <div style={{ padding: 20, color: "#707070" }}>
           Loading<span className="loading-dots" />
         </div>
       ) : sims.length === 0 ? (
         <div
           style={{
             padding: 20,
-            background: "#fff",
-            border: "1px solid #ddd",
-            color: "#888",
+            background: "#d6daf0",
+            border: "1px solid #b7c5d9",
+            color: "#707070",
             textAlign: "center",
+            fontSize: "9pt",
           }}
         >
-          No simulations yet. Click 'New Simulation' to get started.
+          No simulations yet. Click &apos;New Simulation&apos; to get started.
         </div>
       ) : (
         <table className="sim-list">
@@ -236,7 +240,7 @@ export default function TopPage() {
                   </td>
                   <td>{s.board_count}</td>
                   <td>{s.total_posts}</td>
-                  <td style={{ whiteSpace: "nowrap", color: "#666" }}>
+                  <td style={{ whiteSpace: "nowrap", color: "#707070" }}>
                     {s.elapsed_seconds != null && s.elapsed_seconds > 0
                       ? s.elapsed_seconds >= 60
                         ? `${Math.floor(s.elapsed_seconds / 60)}m${Math.round(s.elapsed_seconds % 60)}s`
@@ -248,18 +252,18 @@ export default function TopPage() {
                   </td>
                   <td>
                     {isDeleteTargetRow ? (
-                      <span style={{ display: "inline-flex", gap: 4, alignItems: "center", fontSize: 11 }}>
-                        <span style={{ marginRight: 4, color: "#721c24" }}>Really delete?</span>
+                      <span style={{ display: "inline-flex", gap: 4, alignItems: "center", fontSize: "9pt" }}>
+                        <span style={{ marginRight: 4, color: "#d00000" }}>Really delete?</span>
                         <button
                           className="ochch-btn"
-                          style={{ padding: "2px 8px", fontSize: 11, background: "#dc3545", borderColor: "#dc3545", color: "#fff" }}
+                          style={{ padding: "2px 8px", fontSize: "9pt", color: "#d00000" }}
                           onClick={handleDeleteConfirm}
                         >
                           Yes
                         </button>
                         <button
-                          className="ochch-btn ochch-btn-secondary"
-                          style={{ padding: "2px 8px", fontSize: 11 }}
+                          className="ochch-btn"
+                          style={{ padding: "2px 8px", fontSize: "9pt" }}
                           onClick={handleDeleteCancel}
                         >
                           Cancel
@@ -269,25 +273,25 @@ export default function TopPage() {
                       <span style={{ display: "inline-flex", gap: 4 }}>
                         {inProgress && (
                           <button
-                            className="ochch-btn ochch-btn-secondary"
-                            style={{ padding: "2px 8px", fontSize: 11 }}
+                            className="ochch-btn"
+                            style={{ padding: "2px 8px", fontSize: "9pt" }}
                             onClick={() => handlePause(s.id)}
                           >
-                            ⏸ Pause
+                            Pause
                           </button>
                         )}
                         {isPaused && (
                           <>
                             <button
                               className="ochch-btn"
-                              style={{ padding: "2px 8px", fontSize: 11 }}
+                              style={{ padding: "2px 8px", fontSize: "9pt" }}
                               onClick={() => handleResume(s.id)}
                             >
-                              ▶ Resume
+                              Resume
                             </button>
                             <button
-                              className="ochch-btn ochch-btn-secondary"
-                              style={{ padding: "2px 8px", fontSize: 11 }}
+                              className="ochch-btn"
+                              style={{ padding: "2px 8px", fontSize: "9pt" }}
                               onClick={() => handleDeleteClick(s.id, s.theme)}
                             >
                               Delete
@@ -296,8 +300,8 @@ export default function TopPage() {
                         )}
                         {!inProgress && !isPaused && (
                           <button
-                            className="ochch-btn ochch-btn-secondary"
-                            style={{ padding: "2px 8px", fontSize: 11 }}
+                            className="ochch-btn"
+                            style={{ padding: "2px 8px", fontSize: "9pt" }}
                             onClick={() => handleDeleteClick(s.id, s.theme)}
                           >
                             Delete

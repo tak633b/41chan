@@ -54,18 +54,23 @@ class OracleLLMClient:
     def __init__(self, backend: Optional[str] = None, model: Optional[str] = None):
         self.backend = backend or os.environ.get("ORACLE_LLM_BACKEND", "zai")
 
+        # Re-read env vars at init time (class vars may be stale if dotenv loaded after import)
+        zai_api_key = os.environ.get("ORACLE_ZAI_API_KEY", "") or self.ZAI_API_KEY
+        zai_model = os.environ.get("ORACLE_ZAI_MODEL", "") or self.ZAI_MODEL
+        ollama_model = os.environ.get("ORACLE_OLLAMA_MODEL", "") or self.OLLAMA_MODEL
+
         if self.backend == "zai":
             self.client = OpenAI(
-                api_key=self.ZAI_API_KEY,
+                api_key=zai_api_key,
                 base_url=self.ZAI_BASE_URL,
                 max_retries=0,
                 timeout=90.0,
             )
-            self.model = self.ZAI_MODEL
+            self.model = zai_model
             self._interval = self.MIN_CALL_INTERVAL
         elif self.backend == "openrouter":
             self.client = OpenAI(
-                api_key=self.OPENROUTER_API_KEY,
+                api_key=os.environ.get("OPENROUTER_API_KEY", "") or self.OPENROUTER_API_KEY,
                 base_url=self.OPENROUTER_BASE_URL,
                 max_retries=0,
                 timeout=120.0,
@@ -74,7 +79,7 @@ class OracleLLMClient:
             self._interval = self.OPENROUTER_CALL_INTERVAL
         else:
             self.client = None  # Ollama uses requests directly
-            self.model = model or os.environ.get("ORACLE_OLLAMA_MODEL", self.OLLAMA_MODEL)
+            self.model = model or ollama_model
             self._interval = self.OLLAMA_CALL_INTERVAL
 
         self._last_call_time = 0.0
@@ -222,9 +227,12 @@ class OracleLLMClient:
 
         cleaned = content.strip()
 
-        # Remove code blocks
-        cleaned = re.sub(r"```(?:json)?\s*\n?", "", cleaned, flags=re.IGNORECASE)
-        cleaned = re.sub(r"\n?```\s*$", "", cleaned).strip()
+        # Remove code blocks (handle ``` json, ```json, ``` JSON, trailing ```, etc.)
+        cleaned = re.sub(r"^\s*```\s*(?:json)?\s*\n?", "", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r"\n?\s*```\s*$", "", cleaned, flags=re.MULTILINE).strip()
+        # Also handle mid-text code blocks
+        cleaned = re.sub(r"```\s*(?:json)?\s*\n?", "", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r"\n?\s*```", "", cleaned).strip()
 
         # Fix emoji quote issues (GLM-4.7 outputs various broken patterns)
         # Pattern 1: "emoji":💰,   -> "emoji":"💰",  (no quotes)

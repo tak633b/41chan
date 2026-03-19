@@ -50,32 +50,36 @@ export default function BoardPage({
 
   if (loading) {
     return (
-      <div style={{ padding: 20, color: "#888" }}>
+      <div style={{ padding: 20, color: "#707070" }}>
         Loading<span className="loading-dots" />
       </div>
     );
   }
 
   return (
-    <div>
+    <div style={{ padding: "0 20px" }}>
+      {/* Navigation */}
       <div className="ochch-nav" style={{ marginBottom: 8 }}>
-        <Link href="/">TOP</Link>
-        <Link href={`/sim/${simId}`}>Simulation</Link>
-        <span style={{ color: "#888" }}>▶ {boardName}</span>
+        [<Link href="/">Home</Link>]{" "}
+        [<Link href={`/sim/${simId}`}>Simulation</Link>]{" "}
       </div>
 
-      <div className="ochch-page-title">{boardName} — Threads</div>
+      <div className="ochch-page-title">{boardName}</div>
+      <div style={{ textAlign: "center", fontSize: "9pt", color: "#707070", marginBottom: 12 }}>
+        Threads
+      </div>
 
       {error && (
         <div
           style={{
-            background: "#f8d7da",
-            border: "1px solid #f5c6cb",
+            background: "#d6daf0",
+            border: "1px solid #b7c5d9",
             padding: "6px 10px",
-            color: "#721c24",
+            color: "#d00000",
+            fontSize: "9pt",
           }}
         >
-          ⚠️ {error}
+          {error}
         </div>
       )}
 
@@ -83,10 +87,11 @@ export default function BoardPage({
         <div
           style={{
             padding: 16,
-            background: "#fff",
-            border: "1px solid #ddd",
-            color: "#888",
+            background: "#d6daf0",
+            border: "1px solid #b7c5d9",
+            color: "#707070",
             textAlign: "center",
+            fontSize: "9pt",
           }}
         >
           No threads
@@ -104,12 +109,12 @@ export default function BoardPage({
           <tbody>
             {threads.map((t, i) => (
               <tr key={t.id}>
-                <td style={{ textAlign: "center", color: "#888" }}>{i + 1}</td>
+                <td style={{ textAlign: "center", color: "#707070" }}>{i + 1}</td>
                 <td>
                   <Link href={`/sim/${simId}/thread/${t.id}`}>{t.title}</Link>
                 </td>
                 <td style={{ textAlign: "center" }}>{t.post_count ?? 0}</td>
-                <td style={{ fontSize: 11, color: "#888" }}>
+                <td style={{ fontSize: "9pt", color: "#707070" }}>
                   {formatDate(t.last_post_at)}
                 </td>
               </tr>
@@ -117,6 +122,13 @@ export default function BoardPage({
           </tbody>
         </table>
       )}
+
+      {/* Bottom navigation */}
+      <div className="ochch-nav" style={{ marginTop: 12 }}>
+        [<Link href="/">Home</Link>]{" "}
+        [<Link href={`/sim/${simId}`}>Simulation</Link>]{" "}
+        [<a href="#top">Top</a>]
+      </div>
     </div>
   );
 }

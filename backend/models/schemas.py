@@ -20,6 +20,10 @@ class SimulationCreate(BaseModel):
     custom_rounds: Optional[int] = None
 
 
+class SeedDataInfo(BaseModel):
+    og_image: str = ""
+    source_url: str = ""
+
 class SimulationStatus(BaseModel):
     id: str
     theme: str
@@ -33,6 +37,7 @@ class SimulationStatus(BaseModel):
     board_count: int
     total_posts: int
     elapsed_seconds: Optional[float] = None
+    seed_info: Optional[SeedDataInfo] = None
 
 
 class SimulationSummary(BaseModel):

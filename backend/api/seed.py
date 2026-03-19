@@ -30,6 +30,8 @@ class SeedDataResponse(BaseModel):
     entities: List[str]
     tone: str
     background_context: str
+    og_image: str = ""
+    source_url: str = ""
 
 
 class SeedApplyRequest(BaseModel):
@@ -37,21 +39,26 @@ class SeedApplyRequest(BaseModel):
     seed_data: SeedDataResponse
 
 
-async def _async_fetch_url(url: str) -> str:
-    """httpxで非同期URLフェッチ"""
+async def _async_fetch_url(url: str) -> tuple:
+    """Async URL fetch, returns (text, og_image_url)"""
     headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"}
     async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
         resp = await client.get(url, headers=headers)
         resp.raise_for_status()
         html = resp.text
         import re as _re
+
+        # Extract OG image before stripping tags
+        from core.seed_extractor import extract_og_image
+        og_image = extract_og_image(html)
+
         text = _re.sub(r"<script[^>]*>[\s\S]*?</script>", "", html, flags=_re.IGNORECASE)
         text = _re.sub(r"<style[^>]*>[\s\S]*?</style>", "", text, flags=_re.IGNORECASE)
         text = _re.sub(r"<[^>]+>", " ", text)
         text = _re.sub(r"\s+", " ", text).strip()
         title_match = _re.search(r"<title[^>]*>(.*?)</title>", html, _re.IGNORECASE | _re.DOTALL)
         title = title_match.group(1).strip() if title_match else ""
-        return f"タイトル: {title}\n\n{text[:5000]}"
+        return f"Title: {title}\n\n{text[:5000]}", og_image
 
 
 @router.post("/seed/extract", response_model=SeedDataResponse)
@@ -61,16 +68,18 @@ async def extract_seed(req: SeedExtractRequest):
         raise HTTPException(status_code=400, detail="urlまたはtextのいずれかを指定してください")
 
     try:
+        og_image = ""
+        source_url = req.url or ""
         if req.url:
-            article_text = await _async_fetch_url(req.url)
+            article_text, og_image = await _async_fetch_url(req.url)
         else:
             article_text = req.text
 
-        # Extract用はOllamaを使用（ZAIのレート制限を回避）
-        ollama_llm = OracleLLMClient(backend="ollama")
+        # Use default backend (ZAI/GLM) for extraction
+        llm = OracleLLMClient()
         loop = asyncio.get_event_loop()
         seed = await asyncio.wait_for(
-            loop.run_in_executor(None, lambda: extract_from_text(article_text, llm=ollama_llm)),
+            loop.run_in_executor(None, lambda: extract_from_text(article_text, llm=llm)),
             timeout=60.0
         )
 
@@ -80,12 +89,16 @@ async def extract_seed(req: SeedExtractRequest):
             entities=seed.entities,
             tone=seed.tone,
             background_context=seed.background_context,
+            og_image=og_image,
+            source_url=source_url,
         )
     except asyncio.TimeoutError:
         raise HTTPException(status_code=500, detail="タイムアウト: 処理に時間がかかりすぎました。別のURLを試すか、テキストを直接入力してください。")
     except httpx.HTTPError as e:
         raise HTTPException(status_code=500, detail=f"URL取得失敗: {str(e)}")
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"抽出失敗: {str(e)}")
 
 

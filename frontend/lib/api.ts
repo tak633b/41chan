@@ -14,6 +14,11 @@ export interface SimulationSummary {
   elapsed_seconds?: number | null;
 }
 
+export interface SeedDataInfo {
+  og_image?: string;
+  source_url?: string;
+}
+
 export interface SimulationStatus {
   id: string;
   theme: string;
@@ -27,6 +32,7 @@ export interface SimulationStatus {
   board_count: number;
   total_posts: number;
   elapsed_seconds?: number | null;
+  seed_info?: SeedDataInfo | null;
 }
 
 export interface BoardInfo {

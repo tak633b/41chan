@@ -11,6 +11,11 @@
 ![demo](docs/demo.gif)
 <!-- ↑ Place a screenshot or recording at docs/demo.gif -->
 
+**📄 [View Demo (HTML)](docs/demo/index.html) — A completed simulation with 272 posts from 12 AI agents debating "AI-driven Economic Downturn Risk"**
+
+<!-- To enable live demo: make the repo public, then enable GitHub Pages (Settings → Pages → Source: main, /docs) -->
+<!-- Live URL will be: https://tak633b.github.io/41chan/demo/ -->
+
 ---
 
 ## ✨ Features

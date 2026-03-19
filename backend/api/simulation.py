@@ -32,6 +32,7 @@ async def create_simulation(
     custom_agents: int = Form(None),
     custom_rounds: int = Form(None),
     seed_file: UploadFile = File(None),
+    seed_data_json: str = Form(None),
 ):
     """シミュレーション作成"""
     # ファイル読み込み
@@ -43,12 +44,15 @@ async def create_simulation(
     sim_id = str(uuid.uuid4())
     now = datetime.now().isoformat()
 
+    # Parse seed_data_json if provided (contains og_image, source_url etc.)
+    seed_data_str = seed_data_json or ""
+
     with db_conn() as conn:
         conn.execute(
             """INSERT INTO simulations
                (id, theme, prompt, scale, custom_agents, custom_rounds, status, progress,
-                round_current, round_total, agent_count, board_count, total_posts, created_at, updated_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                round_current, round_total, agent_count, board_count, total_posts, created_at, updated_at, seed_data)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 sim_id,
                 "",
@@ -65,6 +69,7 @@ async def create_simulation(
                 0,
                 now,
                 now,
+                seed_data_str,
             ),
         )
 
@@ -108,6 +113,21 @@ async def get_status(sim_id: str):
     except Exception:
         pass
 
+    # Parse seed_data for og_image
+    seed_info = None
+    try:
+        import json as _json
+        raw_seed = sim.get("seed_data", "")
+        if raw_seed:
+            sd = _json.loads(raw_seed)
+            og_img = sd.get("og_image", "")
+            src_url = sd.get("source_url", "")
+            if og_img or src_url:
+                from models.schemas import SeedDataInfo
+                seed_info = SeedDataInfo(og_image=og_img, source_url=src_url)
+    except Exception:
+        pass
+
     return SimulationStatus(
         id=sim["id"],
         theme=sim.get("theme", ""),
@@ -121,6 +141,7 @@ async def get_status(sim_id: str):
         board_count=len(boards),
         total_posts=sim.get("total_posts", 0),
         elapsed_seconds=elapsed,
+        seed_info=seed_info,
     )
 
 
@@ -424,31 +445,31 @@ def _generate_agents_sync(count: int):
         age = random.randint(18, 65)
         freq = random.choice(FREQUENCIES)
 
-        prompt = f"""5ch掲示板のリアルな住民キャラクターを1人作ってください。
+        prompt = f"""Create one realistic anonymous imageboard poster character.
 
-【条件】
-- 性別: {"男性" if gender == "male" else "女性"}
-- 年齢: {age}歳
+[Requirements]
+- Gender: {gender}
+- Age: {age}
 - MBTI: {mbti}
-- 投稿スタイル: {style}
-- 既存のキャラ名と被らないこと: {', '.join(list(existing)[:10])}
+- Posting style: {style}
+- Name must NOT overlap with: {', '.join(list(existing)[:10])}
 
-以下のJSON形式で返してください:
+Return as JSON:
 {{
-  "name": "日本人のフルネーム（漢字）",
-  "profession": "職業",
-  "tone_style": "口調の特徴（例: タメ口で皮肉屋）",
-  "bio": "一行の紹介文",
-  "persona": "200〜300字の詳細なペルソナ。性格、5chでの書き込み傾向、日常の趣味、議論での立ち位置を含む",
-  "interested_topics": ["関心トピック1", "関心トピック2", "関心トピック3"]
+  "name": "A realistic full name (can be any nationality)",
+  "profession": "Occupation",
+  "tone_style": "Tone characteristics (e.g. sarcastic shitposter, dry wit)",
+  "bio": "One-line introduction",
+  "persona": "Detailed persona in 100-150 words. Include personality, posting habits on anonymous boards, hobbies, and debate style.",
+  "interested_topics": ["topic1", "topic2", "topic3"]
 }}
 
-日本語のみ。英語禁止。"""
+English only. No Japanese. No Chinese."""
 
         try:
             result = llm.chat_json(
                 [
-                    {"role": "system", "content": "キャラクター設定を作るライター。JSON形式で返す。日本語のみ。"},
+                    {"role": "system", "content": "You are a character designer. Return JSON only. English only. No Japanese."},
                     {"role": "user", "content": prompt},
                 ],
                 temperature=0.9,
@@ -456,7 +477,7 @@ def _generate_agents_sync(count: int):
 
             name = result.get("name", "")
             if not name or name in existing:
-                print(f"  [{i+1}/{count}] 名前が空か重複、スキップ", file=sys.stderr, flush=True)
+                print(f"  [{i+1}/{count}] Name empty or duplicate, skip", file=sys.stderr, flush=True)
                 continue
 
             import uuid
@@ -497,29 +518,28 @@ def _generate_agents_sync(count: int):
 
 @router.post("/agents/persistent/enhance")
 async def enhance_persistent_agents():
-    """bad以外の全エージェントのペルソナをLLMで強化"""
+    """Enhance personas for all non-bad persistent agents via LLM"""
     import asyncio
     from core.llm_client import OracleLLMClient
 
     agents = get_persistent_agents(limit=200, include_bad=False)
     if not agents:
-        return {"ok": False, "error": "強化対象のエージェントがいません"}
+        return {"ok": False, "error": "No agents to enhance"}
 
-    # バックグラウンドで実行
     import threading
     t = threading.Thread(target=_enhance_agents_sync, args=(agents,), daemon=False)
     t.start()
 
-    return {"ok": True, "target_count": len(agents), "message": "ペルソナ強化を開始しました"}
+    return {"ok": True, "target_count": len(agents), "message": "Persona enhancement started"}
 
 
 def _enhance_agents_sync(agents: list):
-    """同期的にエージェントのペルソナを強化"""
+    """Synchronously enhance agent personas"""
     import time
     from core.llm_client import OracleLLMClient
 
     llm = OracleLLMClient()
-    print(f"[PersonaEnhance] {len(agents)}人のペルソナ強化開始")
+    print(f"[PersonaEnhance] Starting enhancement for {len(agents)} agents")
 
     for i, agent in enumerate(agents):
         name = agent["name"]
@@ -532,47 +552,47 @@ def _enhance_agents_sync(agents: list):
         posting_style = agent.get("posting_style", "")
         bio = agent.get("bio", "")
 
-        prompt = f"""以下の5ch住民キャラクターのペルソナを充実させてください。
+        prompt = f"""Flesh out the persona for the following anonymous imageboard character.
 
-【現在の情報】
-名前: {name}
-年齢: {age}歳 / 性別: {gender}
-職業: {profession}
+[Current info]
+Name: {name}
+Age: {age} / Gender: {gender}
+Occupation: {profession}
 MBTI: {mbti}
-口調: {tone_style}
-投稿スタイル: {posting_style}
-現在のBIO: {bio}
-現在のペルソナ: {current_persona}
+Tone: {tone_style}
+Posting style: {posting_style}
+Current bio: {bio}
+Current persona: {current_persona}
 
-【依頼】
-この人物の以下を具体的に書いてください（200〜300字、日本語のみ）:
-- 性格の特徴（具体的なエピソードを交えて）
-- 5chでの書き込み傾向（どんな話題に反応するか、どんな口調か）
-- 日常生活の一面（趣味、習慣、こだわり）
-- 議論での立ち位置（どんな時に熱くなるか、何を重視するか）
+[Task]
+Write a detailed persona (100-150 words, English only) covering:
+- Personality traits (with concrete behavioral examples)
+- Posting habits on anonymous boards (what topics trigger them, how they write)
+- Daily life (hobbies, habits, quirks)
+- Debate style (what makes them heated, what they value)
 
-ペルソナテキストのみ返してください。JSON不要。"""
+Return persona text only. No JSON."""
 
         try:
             messages = [
-                {"role": "system", "content": "キャラクター設定を書くライター。テキストのみ返す。"},
+                {"role": "system", "content": "You are a character writer. Return text only. English only. No Japanese."},
                 {"role": "user", "content": prompt},
             ]
             enhanced = llm.chat(messages, temperature=0.85)
             enhanced = enhanced.strip()
 
-            if len(enhanced) > 50:  # 十分な長さがあれば更新
+            if len(enhanced) > 50:
                 with db_conn() as conn:
                     conn.execute(
                         "UPDATE persistent_agents SET persona=? WHERE id=?",
                         (enhanced, agent["id"]),
                     )
-                print(f"  [{i+1}/{len(agents)}] {name}: ペルソナ強化OK ({len(enhanced)}字)")
+                print(f"  [{i+1}/{len(agents)}] {name}: Persona enhanced ({len(enhanced)} chars)")
             else:
-                print(f"  [{i+1}/{len(agents)}] {name}: 生成結果が短すぎてスキップ")
+                print(f"  [{i+1}/{len(agents)}] {name}: Generated text too short, skipped")
         except Exception as e:
-            print(f"  [{i+1}/{len(agents)}] {name}: 失敗 - {e}")
+            print(f"  [{i+1}/{len(agents)}] {name}: Failed - {e}")
 
-        time.sleep(2)  # レート制限対策
+        time.sleep(2)
 
-    print(f"[PersonaEnhance] 完了")
+    print(f"[PersonaEnhance] Done")

@@ -55,7 +55,7 @@ def _extract_relationships_sync(sim_id: str, post: dict, all_posts: list, agents
                     to_id=target_name,
                     relation_type=relation,
                     strength=1.0,
-                    evidence=f"投稿: {content[:100]}",
+                    evidence=f"Post: {content[:100]}",
                 )
         else:
             # アンカーなしの場合、5投稿に1回だけLLMで関係分析
@@ -71,8 +71,8 @@ def _extract_relationships_sync(sim_id: str, post: dict, all_posts: list, agents
 
 def _infer_relation_simple(content: str, target_content: str) -> Optional[str]:
     """簡易テキスト分析で関係を推定（LLMなし）"""
-    agree_words = ["それな", "同意", "わかる", "確かに", "その通り", "正論", "せやな", "いいこと言った"]
-    disagree_words = ["は？", "ねーよ", "嘘乙", "アホか", "違う", "反論", "論破", "それは違う", "おかしい", "ないわ"]
+    agree_words = ["this", "based", "agree", "exactly", "correct", "true", "right", "good point", "well said", "unironically"]
+    disagree_words = ["cope", "wrong", "cringe", "retard", "disagree", "no way", "fake", "bullshit", "schizo", "lmao no", "nah"]
     quote_words = [">>"]
 
     content_lower = content.lower()
@@ -101,24 +101,24 @@ def _extract_with_llm(sim_id: str, post: dict, recent_posts: list, agent_names: 
             for p in recent_posts
         ])
 
-        prompt = f"""以下の掲示板投稿から、エージェント間の関係を抽出してください。
+        prompt = f"""Extract relationships between agents from the following board posts.
 
-【対象投稿】
-{post.get('agent_name', '？')}: {post.get('content', '')[:200]}
+[Target Post]
+{post.get('agent_name', '?')}: {post.get('content', '')[:200]}
 
-【直近の投稿】
+[Recent Posts]
 {posts_text}
 
-【エージェント一覧】
+[Agent List]
 {', '.join(agent_names[:15])}
 
-JSON配列で返してください。関係がなければ空配列 [] を返す:
+Return a JSON array. If no relationships found, return empty array []:
 [
-  {{"from": "発言者名", "to": "対象者名", "type": "agree/disagree/quote/influence", "strength": 1.0}}
+  {{"from": "speaker_name", "to": "target_name", "type": "agree/disagree/quote/influence", "strength": 1.0}}
 ]"""
 
         messages = [
-            {"role": "system", "content": "掲示板投稿からエージェント間の関係を分析する。JSON配列のみ返す。"},
+            {"role": "system", "content": "Analyze board posts to extract agent relationships. Return only a JSON array."},
             {"role": "user", "content": prompt},
         ]
 
@@ -137,7 +137,7 @@ JSON配列で返してください。関係がなければ空配列 [] を返す
                         to_id=rel["to"],
                         relation_type=rel["type"],
                         strength=float(rel.get("strength", 1.0)),
-                        evidence=f"LLM分析: {post.get('content', '')[:80]}",
+                        evidence=f"LLM analysis: {post.get('content', '')[:80]}",
                     )
     except Exception as e:
         print(f"[RelTracker] LLM関係抽出失敗: {e}")
@@ -168,7 +168,7 @@ def get_agent_graph(sim_id: str) -> dict:
         nodes.append({
             "id": a["name"],
             "label": a["name"],
-            "title": f"{a['name']} ({a['tone_style']})\n投稿数: {a['post_count']}",
+            "title": f"{a['name']} ({a['tone_style']})\nPosts: {a['post_count']}",
             "value": a["post_count"] or 1,
             "group": a["tone_style"],
         })

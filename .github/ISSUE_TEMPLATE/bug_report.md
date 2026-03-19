@@ -1,43 +1,43 @@
 ---
-name: 🐛 バグ報告 / Bug Report
-about: 不具合を報告してください
+name: "\U0001F41B Bug Report"
+about: Report a bug or issue
 title: '[Bug] '
 labels: bug
 assignees: ''
 ---
 
-## 概要 / Description
+## Description
 
-バグの簡潔な説明。
+A brief description of the bug.
 
-## 再現手順 / Steps to Reproduce
+## Steps to Reproduce
 
 1. ...
 2. ...
 3. ...
 
-## 期待する動作 / Expected Behavior
+## Expected Behavior
 
-何が起きるべきだったか。
+What should have happened.
 
-## 実際の動作 / Actual Behavior
+## Actual Behavior
 
-実際に何が起きたか。
+What actually happened.
 
-## 環境 / Environment
+## Environment
 
-- **OS**: (例: macOS 15, Ubuntu 24.04)
-- **Python**: (例: 3.12)
-- **Node.js**: (例: 20)
-- **LLMバックエンド**: (例: Ollama qwen3.5:9b / ZAI glm-5)
-- **ブラウザ**: (例: Chrome 130)
+- **OS**: (e.g., macOS 15, Ubuntu 24.04)
+- **Python**: (e.g., 3.12)
+- **Node.js**: (e.g., 20)
+- **LLM Backend**: (e.g., Ollama qwen3.5:9b / ZAI glm-5)
+- **Browser**: (e.g., Chrome 130)
 
-## ログ / Logs
+## Logs
 
 ```
-ここにエラーログを貼り付け
+Paste error logs here
 ```
 
-## スクリーンショット / Screenshots
+## Screenshots
 
-あれば添付してください。
+Attach if available.

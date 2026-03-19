@@ -16,7 +16,7 @@ export default function NewSimulationPage() {
   const [error, setError] = useState("");
   const [seedUrl, setSeedUrl] = useState("");
   const [seedLoading, setSeedLoading] = useState(false);
-  const [seedResult, setSeedResult] = useState<{theme: string; question: string; entities: string[]; background_context: string} | null>(null);
+  const [seedResult, setSeedResult] = useState<{theme: string; question: string; entities: string[]; background_context: string; og_image?: string; source_url?: string} | null>(null);
 
   const handleSeedExtract = async () => {
     if (!seedUrl.trim()) {
@@ -63,6 +63,9 @@ export default function NewSimulationPage() {
       if (file) {
         formData.append("seed_file", file);
       }
+      if (seedResult) {
+        formData.append("seed_data_json", JSON.stringify(seedResult));
+      }
 
       const res = await fetch(`${BASE_URL}/api/simulation/create`, {
         method: "POST",
@@ -83,27 +86,28 @@ export default function NewSimulationPage() {
   };
 
   return (
-    <div>
-      <div className="ochch-page-title">▶ New Simulation</div>
+    <div style={{ padding: "0 20px" }}>
+      <div className="ochch-page-title">New Simulation</div>
 
-      <form onSubmit={handleSubmit} className="ochch-form">
+      <form onSubmit={handleSubmit} className="ochch-form" style={{ margin: "8px 0" }}>
         {error && (
           <div
             style={{
-              background: "#f8d7da",
-              border: "1px solid #f5c6cb",
+              background: "#eef2ff",
+              border: "1px solid #b7c5d9",
               padding: "6px 10px",
               marginBottom: 10,
-              color: "#721c24",
+              color: "#d00000",
+              fontSize: "9pt",
             }}
           >
-            ⚠️ {error}
+            {error}
           </div>
         )}
 
         {/* Seed material input */}
-        <div className="form-group" style={{ background: "#f8f8f8", padding: "10px 12px", border: "1px solid #ddd" }}>
-          <label style={{ color: "#800000", fontWeight: "bold" }}>🔗 Auto-generate theme from article URL</label>
+        <div className="form-group" style={{ background: "#eef2ff", padding: "10px 12px", border: "1px solid #b7c5d9" }}>
+          <label style={{ color: "#af0a0f", fontWeight: "bold" }}>Auto-generate theme from article URL</label>
           <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
             <input
               type="url"
@@ -115,23 +119,29 @@ export default function NewSimulationPage() {
             />
             <button
               type="button"
-              className="ochch-btn ochch-btn-secondary"
+              className="ochch-btn"
               onClick={handleSeedExtract}
               disabled={loading || seedLoading || !seedUrl.trim()}
-              style={{ whiteSpace: "nowrap", fontSize: 12 }}
+              style={{ whiteSpace: "nowrap", fontSize: "9pt" }}
             >
-              {seedLoading ? "Extracting..." : "🔍 Extract"}
+              {seedLoading ? "Extracting..." : "Extract"}
             </button>
           </div>
           {seedResult && (
-            <div style={{ marginTop: 8, fontSize: 12, lineHeight: 1.8, background: "#fff", padding: 8, border: "1px solid #e0e0e0" }}>
-              <div><strong>Theme:</strong> {seedResult.theme}</div>
-              <div><strong>Issue:</strong> {seedResult.question}</div>
-              <div><strong>Entities:</strong> {seedResult.entities?.join(", ")}</div>
-              {seedResult.background_context && (
-                <div><strong>Background:</strong> {seedResult.background_context.slice(0, 150)}...</div>
+            <div style={{ marginTop: 8, fontSize: "9pt", lineHeight: 1.8, background: "#d6daf0", padding: 8, border: "1px solid #b7c5d9" }}>
+              <div><strong style={{ color: "#0f0c5d" }}>Theme:</strong> {seedResult.theme}</div>
+              <div><strong style={{ color: "#0f0c5d" }}>Issue:</strong> {seedResult.question}</div>
+              <div><strong style={{ color: "#0f0c5d" }}>Entities:</strong> {seedResult.entities?.join(", ")}</div>
+              {seedResult.og_image && (
+                <div style={{ margin: "4px 0" }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={seedResult.og_image} alt="Article thumbnail" style={{ maxWidth: 200, maxHeight: 150, border: "1px solid #b7c5d9" }} onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                </div>
               )}
-              <div style={{ color: "#090", marginTop: 4 }}>✅ Theme auto-filled</div>
+              {seedResult.background_context && (
+                <div><strong style={{ color: "#0f0c5d" }}>Background:</strong> {seedResult.background_context.slice(0, 150)}...</div>
+              )}
+              <div style={{ color: "#34345c", marginTop: 4 }}>Theme auto-filled</div>
             </div>
           )}
         </div>
@@ -156,7 +166,7 @@ export default function NewSimulationPage() {
             disabled={loading}
             style={{ border: "none", padding: 0 }}
           />
-          <div style={{ fontSize: 11, color: "#888", marginTop: 2 }}>
+          <div style={{ fontSize: "9pt", color: "#707070", marginTop: 2 }}>
             Provide detailed background info as a text file
           </div>
         </div>
@@ -172,6 +182,7 @@ export default function NewSimulationPage() {
                   alignItems: "center",
                   gap: 4,
                   cursor: "pointer",
+                  fontSize: "10pt",
                 }}
               >
                 <input
@@ -182,11 +193,11 @@ export default function NewSimulationPage() {
                   disabled={loading}
                 />
                 {s === "auto"
-                  ? "Auto (optimized for theme)"
+                  ? "Auto"
                   : s === "mini"
-                  ? "Mini (5 agents · 2 rounds/thread)"
+                  ? "Mini (5 agents)"
                   : s === "full"
-                  ? "Full (12 agents · 5 rounds/thread)"
+                  ? "Full (12 agents)"
                   : "Custom"}
               </label>
             ))}
@@ -222,22 +233,22 @@ export default function NewSimulationPage() {
           </div>
         )}
 
-        <button type="submit" className="ochch-btn" disabled={loading}>
-          {loading ? "Creating simulation..." : "▶ Start Simulation"}
+        <button type="submit" className="ochch-btn-primary" disabled={loading}>
+          {loading ? "Creating simulation..." : "Start Simulation"}
         </button>
       </form>
 
       <div
         style={{
-          fontSize: 12,
-          color: "#888",
-          background: "#fff",
-          border: "1px solid #ddd",
+          fontSize: "9pt",
+          color: "#555",
+          background: "#d6daf0",
+          border: "1px solid #b7c5d9",
           padding: "8px 10px",
           marginTop: 8,
         }}
       >
-        <strong>How it works:</strong>
+        <strong style={{ color: "#0f0c5d" }}>How it works:</strong>
         <ol style={{ margin: "4px 0 0 16px", lineHeight: 1.8 }}>
           <li>Extract entities (people, organizations, concepts) from the seed text</li>
           <li>Auto-generate agents (imageboard participants)</li>

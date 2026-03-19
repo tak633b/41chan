@@ -1,6 +1,7 @@
 """
-シード素材からシミュレーションのテーマ・登場人物・議題を自動抽出する。
-ニュース記事URL or テキストから SeedData を生成。
+Seed Extractor
+Extract simulation themes, entities, and discussion topics from seed material.
+Generates SeedData from news article URLs or raw text.
 """
 
 import re
@@ -18,6 +19,8 @@ class SeedData:
     entities: List[str] = field(default_factory=list)
     tone: str = "neutral"
     background_context: str = ""
+    og_image: str = ""
+    source_url: str = ""
 
     def to_dict(self):
         return asdict(self)
@@ -30,11 +33,30 @@ class SeedData:
             entities=d.get("entities", []),
             tone=d.get("tone", "neutral"),
             background_context=d.get("background_context", ""),
+            og_image=d.get("og_image", ""),
+            source_url=d.get("source_url", ""),
         )
 
 
-def fetch_article_text(url: str) -> str:
-    """URLからテキストを抽出（簡易版: HTML→テキスト変換）"""
+def extract_og_image(html: str) -> str:
+    """Extract og:image URL from HTML meta tags."""
+    patterns = [
+        r'<meta\s+property=["\']og:image["\']\s+content=["\'](.*?)["\']',
+        r'<meta\s+content=["\'](.*?)["\']\s+property=["\']og:image["\']',
+        r'<meta\s+name=["\']twitter:image["\']\s+content=["\'](.*?)["\']',
+        r'<meta\s+content=["\'](.*?)["\']\s+name=["\']twitter:image["\']',
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, html, re.IGNORECASE)
+        if match:
+            url = match.group(1).strip()
+            if url and url.startswith(("http://", "https://")):
+                return url
+    return ""
+
+
+def fetch_article_text(url: str) -> tuple:
+    """Extract text and og:image from URL. Returns (text, og_image_url)."""
     headers = {
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
     }
@@ -44,45 +66,47 @@ def fetch_article_text(url: str) -> str:
         resp.raise_for_status()
         html = resp.text
 
-        # 簡易HTMLタグ除去
+        # Extract OG image before stripping tags
+        og_image = extract_og_image(html)
+
+        # Simple HTML tag removal
         text = re.sub(r'<script[^>]*>[\s\S]*?</script>', '', html, flags=re.IGNORECASE)
         text = re.sub(r'<style[^>]*>[\s\S]*?</style>', '', text, flags=re.IGNORECASE)
         text = re.sub(r'<[^>]+>', ' ', text)
         text = re.sub(r'\s+', ' ', text).strip()
 
-        # タイトル抽出
+        # Title extraction
         title_match = re.search(r'<title[^>]*>(.*?)</title>', html, re.IGNORECASE | re.DOTALL)
         title = title_match.group(1).strip() if title_match else ""
 
-        return f"タイトル: {title}\n\n{text[:5000]}"
+        return f"Title: {title}\n\n{text[:5000]}", og_image
     except Exception as e:
-        # フェッチ失敗時はURLそのものをコンテキストとして返す（LLMが推測）
-        return f"URL: {url}\n\n(記事の直接取得に失敗しました。URLのドメイン・パスからテーマを推測してください: {e})"
+        return f"URL: {url}\n\n(Failed to fetch article directly. Infer the topic from the URL domain/path: {e})", ""
 
 
 def extract_seed_from_text(text: str, llm: Optional[OracleLLMClient] = None) -> SeedData:
-    """テキストからSeedDataを抽出"""
+    """Extract SeedData from text."""
     if llm is None:
         llm = OracleLLMClient()
 
-    prompt = f"""以下のテキストから、5ch掲示板シミュレーションのシード情報を抽出してください。
+    prompt = f"""Extract seed information for an imageboard simulation from the following text.
 
-【テキスト】
+[Text]
 {text[:4000]}
 
-以下のJSON形式で返してください:
+Return in this JSON format:
 {{
-  "theme": "シミュレーションのテーマ（30字以内）",
-  "question": "議論の中心となる問い（疑問文で）",
-  "entities": ["関連するエンティティ1", "エンティティ2", "エンティティ3"],
-  "tone": "議論のトーン（neutral/heated/humorous/serious のいずれか）",
-  "background_context": "議論の背景情報（100〜200字で要約）"
+  "theme": "Simulation theme (concise, under 50 chars)",
+  "question": "Central discussion question (as a question)",
+  "entities": ["Entity 1", "Entity 2", "Entity 3"],
+  "tone": "Discussion tone (neutral/heated/humorous/serious)",
+  "background_context": "Background context summary (100-200 words)"
 }}
 
-日本語で返してください。"""
+Respond in English."""
 
     messages = [
-        {"role": "system", "content": "テキストからシミュレーション用のシード情報を抽出するアシスタント。JSON形式で返す。"},
+        {"role": "system", "content": "You extract seed information for simulations from text. Return only JSON."},
         {"role": "user", "content": prompt},
     ]
 
@@ -97,11 +121,14 @@ def extract_seed_from_text(text: str, llm: Optional[OracleLLMClient] = None) -> 
 
 
 def extract_from_url(url: str, llm: Optional[OracleLLMClient] = None) -> SeedData:
-    """URLからSeedDataを抽出"""
-    text = fetch_article_text(url)
-    return extract_seed_from_text(text, llm)
+    """Extract SeedData from URL."""
+    text, og_image = fetch_article_text(url)
+    seed = extract_seed_from_text(text, llm)
+    seed.og_image = og_image
+    seed.source_url = url
+    return seed
 
 
 def extract_from_text(text: str, llm: Optional[OracleLLMClient] = None) -> SeedData:
-    """テキストからSeedDataを抽出"""
+    """Extract SeedData from text."""
     return extract_seed_from_text(text, llm)

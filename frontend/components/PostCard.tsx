@@ -10,6 +10,7 @@ interface Props {
   isNew?: boolean;
   isFirstPost?: boolean;
   threadTitle?: string;
+  ogImage?: string;
 }
 
 // ─── Name display utility ─────────────────────────────────────────
@@ -47,7 +48,25 @@ function getPosterId(agentName: string): string {
   return h.toString(36).padStart(8, "0").slice(0, 8);
 }
 
-export default function PostCard({ post, allPosts, onNameClick, isNew, isFirstPost, threadTitle }: Props) {
+/** Generate a color from poster ID (4chan-style ID coloring) */
+function getIdColor(posterId: string): string {
+  let hash = 0;
+  for (let i = 0; i < posterId.length; i++) {
+    hash = ((hash << 5) - hash + posterId.charCodeAt(i)) | 0;
+  }
+  hash = hash >>> 0;
+  const r = (hash & 0xFF0000) >> 16;
+  const g = (hash & 0x00FF00) >> 8;
+  const b = hash & 0x0000FF;
+  // Ensure readable on both light and dark backgrounds
+  const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+  if (lum > 200) {
+    return `rgb(${Math.floor(r * 0.7)}, ${Math.floor(g * 0.7)}, ${Math.floor(b * 0.7)})`;
+  }
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
+export default function PostCard({ post, allPosts, onNameClick, isNew, isFirstPost, threadTitle, ogImage }: Props) {
   const [popupPost, setPopupPost] = useState<PostInfo | null>(null);
   const [popupPos, setPopupPos] = useState({ x: 0, y: 0 });
   // Toggle state for showing real name (default: hidden = anonymous)
@@ -57,13 +76,14 @@ export default function PostCard({ post, allPosts, onNameClick, isNew, isFirstPo
   const kotehan = isKotehan(post.agent_name);
   const tripcode = kotehan ? getTripcode(post.agent_name) : null;
   const posterId = getPosterId(post.agent_name);
+  const idColor = getIdColor(posterId);
 
   // Determine display name
   const displayedName = kotehan
-    ? `${post.agent_name} ◆${tripcode}` // Named handle: always show real name + tripcode
+    ? post.agent_name
     : showRealName
-    ? post.agent_name // Anonymous (real name toggled on)
-    : post.username;  // Anonymous (default: Anonymous@board)
+    ? post.agent_name
+    : post.username;
 
   const nameTitle = kotehan
     ? `View ${post.agent_name}'s profile`
@@ -71,30 +91,18 @@ export default function PostCard({ post, allPosts, onNameClick, isNew, isFirstPo
     ? "Click: view profile / Double-click: return to anonymous"
     : "Click to reveal real name (anonymous mode)";
 
-  const nameStyle: React.CSSProperties = {
-    cursor: "pointer",
-    // Named handle: dark green, anonymous (real name visible): blue, anonymous: maroon
-    color: kotehan ? "#006400" : showRealName ? "#0000cc" : "#800000",
-    fontWeight: kotehan ? "bold" : "normal",
-    userSelect: "none" as const,
-  };
-
   const handleNameClick = () => {
     if (kotehan) {
-      // Named handle: click opens profile modal
       onNameClick?.(post.agent_name);
     } else if (showRealName) {
-      // Real name visible → open profile modal
       onNameClick?.(post.agent_name);
     } else {
-      // Anonymous mode → toggle real name display
       setShowRealName(true);
     }
   };
 
   const handleNameDoubleClick = () => {
     if (!kotehan && showRealName) {
-      // Double-click while real name visible → return to anonymous
       setShowRealName(false);
     }
   };
@@ -118,24 +126,20 @@ export default function PostCard({ post, allPosts, onNameClick, isNew, isFirstPo
 
   // Convert >>N anchors to interactive elements & >>text greentext
   const renderContent = (content: string) => {
-    // Split by lines first to handle greentext properly
     const lines = content.split("\n");
     const result: React.ReactNode[] = [];
 
     lines.forEach((line, lineIdx) => {
-      // Check if this line is greentext (starts with >)
       if (line.startsWith(">") && !line.startsWith(">>")) {
-        // This is greentext - render it in green
         result.push(
           <div
             key={`line-${lineIdx}`}
-            style={{ color: "#789922", fontWeight: "normal" }}
+            style={{ color: "#789922" }}
           >
             {line}
           </div>
         );
       } else {
-        // Normal line - process for >>N anchors
         const parts = line.split(/(>>\d+)/g);
         const lineContent = parts.map((part, i) => {
           const match = part.match(/^>>(\d+)$/);
@@ -186,69 +190,91 @@ export default function PostCard({ post, allPosts, onNameClick, isNew, isFirstPo
     }
   };
 
-  // Deterministic file size/dimensions from post content hash
-  const fileHash = hashName(post.post_id || post.content);
-  const fileSize = 20 + (fileHash % 180); // 20-200 KB
-  const fileWidth = 320 + (fileHash % 960);  // 320-1280
-  const fileHeight = 240 + ((fileHash >> 8) % 720); // 240-960
+  // OP: transparent+inline, Reply: #d6daf0+display:table
+  const isOP = isFirstPost;
+  const postClass = `post-item${isOP ? "" : " post-reply"}${isNew ? " post-new" : ""}`;
 
   return (
+    <div className="post-wrapper" ref={containerRef} id={`post-${post.post_num}`}>
     <div
-      className={`post-item${isNew ? " post-new" : ""}`}
-      ref={containerRef}
-      id={`post-${post.post_num}`}
+      className={postClass}
     >
-      {/* Subject line - only on first post of thread */}
-      {isFirstPost && threadTitle && (
-        <div className="post-subject">{threadTitle}</div>
+      {/* File info for first post */}
+      {isFirstPost && ogImage && (
+        <div className="post-file-info">
+          File: <a href={ogImage} target="_blank" rel="noopener noreferrer" style={{ color: "#34345c" }}>
+            {ogImage.split("/").pop()?.slice(0, 40) || "image.jpg"}
+          </a>
+        </div>
       )}
 
+      {/* OG image for first post */}
+      {isFirstPost && ogImage && (
+        <div style={{ margin: "4px 0 8px 0" }}>
+          <a href={ogImage} target="_blank" rel="noopener noreferrer">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001"}/api/image-proxy?url=${encodeURIComponent(ogImage)}`}
+              alt="Article thumbnail"
+              style={{
+                maxWidth: 250,
+                maxHeight: 250,
+                border: "1px solid #b7c5d9",
+                cursor: "pointer",
+              }}
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = "none";
+              }}
+            />
+          </a>
+        </div>
+      )}
+
+      {/* Post header: Subject Name Timestamp No.N ID:xxx */}
       <div className="post-header">
+        {isFirstPost && threadTitle && (
+          <span className="post-subject">{threadTitle} </span>
+        )}
         <span
           className="post-name"
-          style={nameStyle}
+          style={{ cursor: "pointer" }}
           onClick={handleNameClick}
           onDoubleClick={handleNameDoubleClick}
           title={nameTitle}
         >
           {displayedName}
-          {!kotehan && !showRealName && (
-            <span
-              style={{
-                fontSize: "0.7em",
-                opacity: 0.5,
-                marginLeft: 2,
-                fontWeight: "normal",
-              }}
-            >
-              [?]
-            </span>
-          )}
         </span>
-        <span className="post-time">{format4chanTime(post.timestamp)}</span>
-        <span className="post-id">
-          ID:<span>{posterId}</span>
-        </span>
+        {kotehan && tripcode && (
+          <span className="post-tripcode"> ◆{tripcode}</span>
+        )}
+        {!kotehan && !showRealName && (
+          <span
+            style={{
+              fontSize: "8pt",
+              opacity: 0.4,
+              cursor: "pointer",
+            }}
+            onClick={handleNameClick}
+          >
+            [?]
+          </span>
+        )}{" "}
+        <span className="post-time">{format4chanTime(post.timestamp)}</span>{" "}
         <span className="post-num">
           No.<a
             href={`#post-${post.post_num}`}
-            style={{ color: "inherit", textDecoration: "none" }}
           >
             {post.post_num}
           </a>
+        </span>{" "}
+        <span className="post-id" style={{ color: idColor }}>
+          ID:{posterId}
         </span>
       </div>
 
-      {/* Dummy file info line for first post */}
-      {isFirstPost && (
-        <div className="post-file-info">
-          File: <a href="#" onClick={(e) => e.preventDefault()} style={{ color: "#0066cc", textDecoration: "underline" }}>imageboard_sim.jpg</a>{" "}
-          ({fileSize} KB, {fileWidth}x{fileHeight})
-        </div>
-      )}
-
+      {/* Reply to anchor */}
       {post.reply_to && (
-        <div style={{ fontSize: 12, color: "#666", marginBottom: 2 }}>
+        <div style={{ fontSize: "10pt", marginTop: 2 }}>
           <span
             className="anchor-link"
             onMouseEnter={(e) => handleAnchorHover(e, post.reply_to!, true)}
@@ -282,6 +308,7 @@ export default function PostCard({ post, allPosts, onNameClick, isNew, isFirstPo
           </div>
         </div>
       )}
+    </div>
     </div>
   );
 }
