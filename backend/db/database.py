@@ -273,6 +273,11 @@ def get_simulation(sim_id: str) -> Optional[Dict]:
 def update_simulation(sim_id: str, **kwargs):
     from datetime import datetime, timezone
     kwargs["updated_at"] = datetime.now().isoformat()
+    # Column names are interpolated into the SQL text, so reject anything that is not
+    # a plain identifier to keep this safe against injection via caller-supplied keys.
+    for k in kwargs:
+        if not k.isidentifier():
+            raise ValueError(f"Invalid column name: {k!r}")
     sets = ", ".join(f"{k}=?" for k in kwargs)
     vals = list(kwargs.values()) + [sim_id]
     with db_conn() as conn:

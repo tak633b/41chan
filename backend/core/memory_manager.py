@@ -56,8 +56,8 @@ class MemoryManager:
     # 長期記憶用 ChromaDB PersistentClient（プロセス内で1インスタンス共有）
     _longterm_client = None
     _longterm_lock = threading.Lock()
-    _LONGTERM_DB_DIR = "/Users/takashihasumura/41chan/backend/db/chroma_longterm"
-    _AGENT_MEMORIES_DIR = "/Users/takashihasumura/41chan/backend/data/agent_memories"
+    _LONGTERM_DB_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "db", "chroma_longterm")
+    _AGENT_MEMORIES_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "agent_memories")
 
     @classmethod
     def _get_longterm_client(cls):
