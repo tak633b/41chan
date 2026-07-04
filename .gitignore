@@ -24,3 +24,4 @@ backup/
 # Runtime data (generated during simulation)
 backend/data/
 backend/db/chroma_longterm/
+backend/venv
